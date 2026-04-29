@@ -8,13 +8,17 @@ export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export async function loader({ request }: LoaderFunctionArgs) {
   await authenticate.admin(request);
-  return json({ apiKey: process.env.SHOPIFY_API_KEY ?? "" });
+  const url = new URL(request.url);
+  return json({
+    apiKey: process.env.SHOPIFY_API_KEY ?? "",
+    host: url.searchParams.get("host") ?? "",
+  });
 }
 
 export default function AppLayout() {
-  const { apiKey } = useLoaderData<typeof loader>();
+  const { apiKey, host } = useLoaderData<typeof loader>();
   return (
-    <AppProvider isEmbeddedApp apiKey={apiKey}>
+    <AppProvider isEmbeddedApp apiKey={apiKey} host={host}>
       <Outlet />
     </AppProvider>
   );
