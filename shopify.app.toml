@@ -1,29 +1,24 @@
 name = "dml-ab-test-private"
-client_id = "${SHOPIFY_API_KEY}"
-application_url = "${SHOPIFY_APP_URL}"
+client_id = "b9ad9c8312703f0e31de61fa82b00b72"
+application_url = "https://dml-ab-test.vercel.app"
 embedded = true
 
 [build]
 automatically_update_urls_on_dev = true
 dev_store_url = ""
-include_config_on_deploy = true
 
 [access_scopes]
 scopes = "read_orders,read_themes,write_script_tags"
 
 [auth]
 redirect_urls = [
-  "${SHOPIFY_APP_URL}/auth/callback",
-  "${SHOPIFY_APP_URL}/auth/shopify/callback",
-  "${SHOPIFY_APP_URL}/api/auth/callback"
+  "https://dml-ab-test.vercel.app/auth/callback",
+  "https://dml-ab-test.vercel.app/auth/shopify/callback",
+  "https://dml-ab-test.vercel.app/api/auth/callback"
 ]
 
 [webhooks]
 api_version = "2025-01"
-
-  [[webhooks.subscriptions]]
-  topics = [ "orders/create" ]
-  uri = "/webhooks/orders_create"
 
 [pos]
 embedded = false

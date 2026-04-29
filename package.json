@@ -21,6 +21,7 @@
     "@shopify/shopify-app-remix": "latest",
     "@shopify/shopify-app-session-storage-prisma": "latest",
     "@shopify/shopify-api": "latest",
+    "@remix-run/vercel": "latest",
     "isbot": "latest",
     "prisma": "^6.8.2",
     "react": "latest",
