@@ -1,0 +1,19 @@
+{% schema %}
+{
+  "name": "DML AB Test Embed",
+  "target": "body",
+  "settings": [
+    { "type": "text", "id": "app_base_url", "label": "App base URL", "default": "https://your-app-url" },
+    { "type": "text", "id": "shop_domain", "label": "Shop domain", "default": "{{ shop.permanent_domain }}" }
+  ]
+}
+{% endschema %}
+
+<script>
+  window.DML_AB_TEST = {
+    appBaseUrl: "{{ block.settings.app_base_url | escape }}",
+    shopDomain: "{{ shop.permanent_domain | escape }}",
+    template: "{{ template.name | escape }}"
+  };
+</script>
+<script src="{{ 'ab-test.js' | asset_url }}" defer></script>

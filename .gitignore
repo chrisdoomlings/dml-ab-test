@@ -1,0 +1,9 @@
+node_modules/
+.cache/
+build/
+dist/
+.vercel/
+.env
+*.log
+coverage/
+.DS_Store

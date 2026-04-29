@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Shop {
+  id          String       @id @default(cuid())
+  shopDomain  String       @unique
+  accessToken String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  experiments Experiment[]
+}
+
+model Experiment {
+  id                String              @id @default(cuid())
+  shopId            String
+  name              String
+  targetType        TargetType          @default(ALL_PAGES)
+  targetValue       String?
+  trafficSplitA     Int                 @default(50)
+  status            ExperimentStatus    @default(DRAFT)
+  startsAt          DateTime?
+  endsAt            DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  shop              Shop                @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  variants          Variant[]
+  assignments       VisitorAssignment[]
+  events            Event[]
+  orderAttributions OrderAttribution[]
+}
+
+model Variant {
+  id           String      @id @default(cuid())
+  experimentId String
+  key          VariantKey
+  selector     String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  experiment   Experiment  @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+
+  @@unique([experimentId, key])
+}
+
+model VisitorAssignment {
+  id           String      @id @default(cuid())
+  experimentId String
+  visitorId    String
+  sessionId    String?
+  variantKey   VariantKey
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  experiment   Experiment  @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+
+  @@unique([experimentId, visitorId])
+  @@index([visitorId])
+}
+
+model Event {
+  id            String      @id @default(cuid())
+  experimentId  String
+  visitorId     String
+  assignmentId  String?
+  variantKey    VariantKey
+  eventType     EventType
+  eventValue    Float?
+  currency      String?
+  pagePath      String?
+  productId     String?
+  cartToken     String?
+  checkoutToken String?
+  orderId       String?
+  metadata      Json?
+  createdAt     DateTime    @default(now())
+  experiment    Experiment  @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+
+  @@index([experimentId, eventType])
+  @@index([visitorId, createdAt])
+}
+
+model OrderAttribution {
+  id           String      @id @default(cuid())
+  experimentId String
+  orderId      String      @unique
+  visitorId    String
+  variantKey   VariantKey
+  revenue      Float
+  currency     String
+  createdAt    DateTime    @default(now())
+  experiment   Experiment  @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+
+  @@index([experimentId, variantKey])
+}
+
+enum VariantKey {
+  A
+  B
+}
+
+enum ExperimentStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  STOPPED
+}
+
+enum TargetType {
+  ALL_PAGES
+  TEMPLATE
+  PATH_PREFIX
+  EXACT_PATH
+}
+
+enum EventType {
+  IMPRESSION
+  CLICK
+  ADD_TO_CART
+  CHECKOUT_STARTED
+  PURCHASE
+}
