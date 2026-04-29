@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "shopify app dev",
-    "build": "remix build",
-    "start": "remix-serve build",
+    "build": "prisma generate && remix vite:build",
+    "start": "remix-serve ./build/server/index.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio"
@@ -21,7 +21,6 @@
     "@shopify/shopify-app-remix": "latest",
     "@shopify/shopify-app-session-storage-prisma": "latest",
     "@shopify/shopify-api": "latest",
-    "@remix-run/vercel": "latest",
     "isbot": "latest",
     "prisma": "^6.8.2",
     "react": "latest",
