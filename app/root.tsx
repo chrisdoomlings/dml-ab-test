@@ -17,7 +17,7 @@ export default function Root() {
         <Meta />
         <Links />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         <Outlet />
         <ScrollRestoration />
         <Scripts />
