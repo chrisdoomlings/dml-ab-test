@@ -3,6 +3,7 @@ import { Form, useActionData } from "@remix-run/react";
 import { Button, Card, FormLayout, Page, Select, TextField } from "@shopify/polaris";
 import { z } from "zod";
 import { createExperiment } from "../models/experiments.server";
+import { requireShopRecord } from "../lib/shop.server";
 
 const Schema = z.object({
   name: z.string().min(3),
@@ -14,6 +15,7 @@ const Schema = z.object({
 });
 
 export async function action({ request }: ActionFunctionArgs) {
+  const shop = await requireShopRecord(request);
   const formData = await request.formData();
   const raw = Object.fromEntries(formData.entries());
   const parsed = Schema.safeParse(raw);
@@ -22,11 +24,8 @@ export async function action({ request }: ActionFunctionArgs) {
     return json({ ok: false, errors: parsed.error.flatten() }, { status: 400 });
   }
 
-  const shopId = process.env.SINGLE_SHOP_ID;
-  if (!shopId) throw new Error("Missing SINGLE_SHOP_ID env");
-
   const experiment = await createExperiment({
-    shopId,
+    shopId: shop.id,
     ...parsed.data,
   });
 

@@ -3,13 +3,15 @@ import { useLoaderData } from "@remix-run/react";
 import { Badge, Card, Page, Text } from "@shopify/polaris";
 import { getExperimentSummary } from "../models/experiments.server";
 import { prisma } from "../lib/db.server";
+import { requireShopRecord } from "../lib/shop.server";
 
-export async function loader({ params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {
+  const shop = await requireShopRecord(request);
   const id = params.id;
   if (!id) throw new Response("Not found", { status: 404 });
 
-  const experiment = await prisma.experiment.findUnique({
-    where: { id },
+  const experiment = await prisma.experiment.findFirst({
+    where: { id, shopId: shop.id },
     include: { variants: true },
   });
   if (!experiment) throw new Response("Not found", { status: 404 });

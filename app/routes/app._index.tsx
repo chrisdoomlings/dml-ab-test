@@ -2,18 +2,11 @@ import { json, type LoaderFunctionArgs } from "@remix-run/node";
 import { Link, useLoaderData } from "@remix-run/react";
 import { Card, Page, Text } from "@shopify/polaris";
 import { listExperiments } from "../models/experiments.server";
-
-// Replace with real auth from shopify-app-remix in production.
-async function getSingleShopId() {
-  const shopId = process.env.SINGLE_SHOP_ID;
-  if (!shopId) throw new Error("Set SINGLE_SHOP_ID in env for local starter");
-  return shopId;
-}
+import { requireShopRecord } from "../lib/shop.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  void request;
-  const shopId = await getSingleShopId();
-  const experiments = await listExperiments(shopId);
+  const shop = await requireShopRecord(request);
+  const experiments = await listExperiments(shop.id);
   return json({ experiments });
 }
 
