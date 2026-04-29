@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@prisma/client": "latest",
+    "@remix-run/dev": "latest",
     "@remix-run/node": "latest",
     "@remix-run/react": "latest",
     "@shopify/app-bridge-react": "latest",
@@ -23,6 +24,7 @@
     "prisma": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "remix-serve": "latest",
     "zod": "latest"
   }
 }
