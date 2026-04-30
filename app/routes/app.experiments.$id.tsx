@@ -48,6 +48,29 @@ function selectorFor(experiment: ReturnType<typeof useLoaderData<typeof loader>>
   return experiment.variants.find((variant) => variant.key === key)?.selector ?? "No selector";
 }
 
+function assignmentModeLabel(mode: string, ttlDays: number | null) {
+  if (mode === "SESSION") return "Per session";
+  if (ttlDays && ttlDays > 0) return `Sticky, re-randomize every ${ttlDays} day${ttlDays > 1 ? "s" : ""}`;
+  return "Sticky forever";
+}
+
+function audienceRuleLabel(rule: string) {
+  if (rule === "NEW_VISITORS") return "New visitors only";
+  if (rule === "RETURNING_VISITORS") return "Returning visitors only";
+  return "All visitors";
+}
+
+function dateTimeLabel(value: string | Date | null) {
+  if (!value) return "Not set";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
 function MiniChart({ cvrA, cvrB }: { cvrA: number; cvrB: number }) {
   const maxValue = Math.max(cvrA, cvrB, 0.01);
   const barHeightA = Math.round((cvrA / maxValue) * 120);
@@ -171,6 +194,18 @@ export default function ExperimentDetailsPage() {
           <MetricCard label="Progress" value={experiment.certaintyScore >= 85 ? "Significant" : "Learning"} detail={`${experiment.certaintyScore}% certainty`} />
           <MetricCard label="Revenue" value={money(experiment.revenueA + experiment.revenueB)} detail="Orders data after approval" />
         </InlineGrid>
+
+        <Card>
+          <BlockStack gap="200">
+            <Text as="h2" variant="headingMd">Experiment rules</Text>
+            <InlineGrid columns={{ xs: 1, md: 2 }} gap="200">
+              <Text as="p" tone="subdued">Assignment<br /><Text as="span" fontWeight="semibold">{assignmentModeLabel(experiment.assignmentMode, experiment.assignmentTtlDays)}</Text></Text>
+              <Text as="p" tone="subdued">Audience<br /><Text as="span" fontWeight="semibold">{audienceRuleLabel(experiment.audienceRule)}</Text></Text>
+              <Text as="p" tone="subdued">Starts at<br /><Text as="span" fontWeight="semibold">{dateTimeLabel(experiment.startedAt)}</Text></Text>
+              <Text as="p" tone="subdued">Ends at<br /><Text as="span" fontWeight="semibold">{dateTimeLabel(experiment.endedAt)}</Text></Text>
+            </InlineGrid>
+          </BlockStack>
+        </Card>
 
         <Card>
           <BlockStack gap="300">
