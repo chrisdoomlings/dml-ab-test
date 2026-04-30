@@ -47,14 +47,23 @@ export default function NewExperimentPage() {
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
 
-  // Only targetType needs controlled state — it drives conditional rendering.
-  // TextFields use Polaris internal state; no value/onChange avoids SSR hydration mismatch.
-  const [targetType, setTargetType] = useState("ALL_PAGES");
+  const [formValues, setFormValues] = useState({
+    name: "",
+    targetType: "ALL_PAGES",
+    targetValue: "",
+    trafficSplitA: "50",
+    selectorA: "",
+    selectorB: "",
+  });
+  const setField =
+    (field: keyof typeof formValues) =>
+    (value: string) =>
+      setFormValues((prev) => ({ ...prev, [field]: value }));
 
-  const needsTargetValue = targetType !== "ALL_PAGES";
+  const needsTargetValue = formValues.targetType !== "ALL_PAGES";
   const targetValueHelp =
-    targetType === "TEMPLATE" ? "e.g. product, collection, index" :
-    targetType === "PATH_PREFIX" ? "e.g. /collections/sale" :
+    formValues.targetType === "TEMPLATE" ? "e.g. product, collection, index" :
+    formValues.targetType === "PATH_PREFIX" ? "e.g. /collections/sale" :
     "e.g. /products/my-item";
 
   const errors = actionData && !actionData.ok ? (actionData as ErrorData) : null;
@@ -71,6 +80,8 @@ export default function NewExperimentPage() {
             <TextField
               label="Experiment name"
               name="name"
+              value={formValues.name}
+              onChange={setField("name")}
               autoComplete="off"
               placeholder="Homepage hero image test"
               error={fieldError(errors, "name")}
@@ -79,13 +90,15 @@ export default function NewExperimentPage() {
               label="Target type"
               name="targetType"
               options={TARGET_OPTIONS}
-              value={targetType}
-              onChange={setTargetType}
+              value={formValues.targetType}
+              onChange={setField("targetType")}
             />
             {needsTargetValue ? (
               <TextField
                 label="Target value"
                 name="targetValue"
+                value={formValues.targetValue}
+                onChange={setField("targetValue")}
                 autoComplete="off"
                 helpText={targetValueHelp}
                 error={fieldError(errors, "targetValue")}
@@ -94,6 +107,8 @@ export default function NewExperimentPage() {
             <TextField
               label="Traffic split for Variant A"
               name="trafficSplitA"
+              value={formValues.trafficSplitA}
+              onChange={setField("trafficSplitA")}
               autoComplete="off"
               type="number"
               min={1}
@@ -105,6 +120,8 @@ export default function NewExperimentPage() {
             <TextField
               label="Original selector / section ID"
               name="selectorA"
+              value={formValues.selectorA}
+              onChange={setField("selectorA")}
               autoComplete="off"
               placeholder="#section-hero-original"
               error={fieldError(errors, "selectorA")}
@@ -112,6 +129,8 @@ export default function NewExperimentPage() {
             <TextField
               label="Variant selector / section ID"
               name="selectorB"
+              value={formValues.selectorB}
+              onChange={setField("selectorB")}
               autoComplete="off"
               placeholder="#section-hero-variant"
               error={fieldError(errors, "selectorB")}
