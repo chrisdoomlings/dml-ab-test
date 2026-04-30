@@ -6,6 +6,7 @@
   var ASSIGNMENTS_KEY = "dml_ab_assignments";
   var EXPERIMENTS_KEY = "dml_ab_experiments";
   var visitorId = getOrCreateVisitorId();
+  var ASSIGNMENT_COOKIE = "dml_ab_assignments";
 
   function getOrCreateVisitorId() {
     try {
@@ -19,12 +20,43 @@
     }
   }
 
-  function getAssignments() {
+  function readCookie(name) {
+    var prefix = name + "=";
+    var cookies = document.cookie ? document.cookie.split(";") : [];
+    for (var i = 0; i < cookies.length; i += 1) {
+      var value = cookies[i].trim();
+      if (value.indexOf(prefix) === 0) return value.slice(prefix.length);
+    }
+    return "";
+  }
+
+  function writeCookie(name, value, maxAgeSeconds) {
     try {
-      return JSON.parse(localStorage.getItem(ASSIGNMENTS_KEY) || "{}");
+      document.cookie =
+        name +
+        "=" +
+        value +
+        "; path=/; max-age=" +
+        String(maxAgeSeconds) +
+        "; SameSite=Lax";
+    } catch (e) {
+      // noop
+    }
+  }
+
+  function parseAssignments(text) {
+    try {
+      var parsed = JSON.parse(text || "{}");
+      return parsed && typeof parsed === "object" ? parsed : {};
     } catch (e) {
       return {};
     }
+  }
+
+  function getAssignments() {
+    var fromStorage = parseAssignments(localStorage.getItem(ASSIGNMENTS_KEY) || "{}");
+    var fromCookie = parseAssignments(decodeURIComponent(readCookie(ASSIGNMENT_COOKIE) || ""));
+    return Object.assign({}, fromCookie, fromStorage);
   }
 
   function saveAssignments(map) {
@@ -33,20 +65,37 @@
     } catch (e) {
       // noop
     }
+    writeCookie(ASSIGNMENT_COOKIE, encodeURIComponent(JSON.stringify(map)), 60 * 60 * 24 * 30);
   }
 
   function getCachedExperiments() {
     try {
       var cached = JSON.parse(localStorage.getItem(EXPERIMENTS_KEY) || "[]");
-      return Array.isArray(cached) ? cached : [];
+      if (Array.isArray(cached)) {
+        return { pagePath: location.pathname, experiments: cached };
+      }
+      if (!cached || typeof cached !== "object") {
+        return { pagePath: "", experiments: [] };
+      }
+      return {
+        pagePath: String(cached.pagePath || ""),
+        experiments: Array.isArray(cached.experiments) ? cached.experiments : [],
+      };
     } catch (e) {
-      return [];
+      return { pagePath: "", experiments: [] };
     }
   }
 
   function saveCachedExperiments(experiments) {
     try {
-      localStorage.setItem(EXPERIMENTS_KEY, JSON.stringify(experiments || []));
+      localStorage.setItem(
+        EXPERIMENTS_KEY,
+        JSON.stringify({
+          pagePath: location.pathname,
+          savedAt: Date.now(),
+          experiments: experiments || [],
+        }),
+      );
     } catch (e) {
       // noop
     }
@@ -122,9 +171,12 @@
   }
 
   // Apply last known assignments immediately to reduce refresh flicker.
-  getCachedExperiments().forEach(function (exp) {
-    applyExperiment(exp, { skipImpression: true });
-  });
+  var cached = getCachedExperiments();
+  if (cached.pagePath === location.pathname) {
+    cached.experiments.forEach(function (exp) {
+      applyExperiment(exp, { skipImpression: true });
+    });
+  }
 
   fetch(
     cfg.appBaseUrl +
@@ -136,6 +188,10 @@
       encodeURIComponent(cfg.template || "") +
       "&visitorId=" +
       encodeURIComponent(visitorId),
+    {
+      credentials: "omit",
+      cache: "no-store",
+    },
   )
     .then(function (r) {
       return r.json();

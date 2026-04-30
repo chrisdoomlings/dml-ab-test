@@ -15,4 +15,28 @@
     template: "{{ template.name | escape }}"
   };
 </script>
-<script src="{{ 'ab-test.js' | asset_url }}" defer></script>
+<script>
+  (function () {
+    try {
+      var raw = localStorage.getItem("dml_ab_experiments");
+      if (!raw) return;
+      var cached = JSON.parse(raw);
+      var payload = Array.isArray(cached)
+        ? { pagePath: window.location.pathname, experiments: cached }
+        : cached;
+      if (!payload || payload.pagePath !== window.location.pathname) return;
+      (payload.experiments || []).forEach(function (exp) {
+        if (!exp || !exp.variants) return;
+        var nodeA = document.querySelector(exp.variants.A);
+        var nodeB = document.querySelector(exp.variants.B);
+        if (!nodeA || !nodeB) return;
+        var showA = exp.variant === "A";
+        nodeA.style.display = showA ? "" : "none";
+        nodeB.style.display = showA ? "none" : "";
+      });
+    } catch (e) {
+      // noop
+    }
+  })();
+</script>
+<script src="{{ 'ab-test.js' | asset_url }}"></script>
