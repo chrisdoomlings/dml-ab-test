@@ -2,6 +2,7 @@ import { json, redirect, type ActionFunctionArgs } from "@remix-run/node";
 import { Form, useActionData, useNavigation } from "@remix-run/react";
 import { useState } from "react";
 import { BlockStack, Button, ButtonGroup, Card, FormLayout, Page, Select, TextField } from "@shopify/polaris";
+import { AudienceRule, AssignmentMode, ExperimentStatus } from "@prisma/client";
 import { z } from "zod";
 import { createExperiment } from "../models/experiments.server";
 import { requireShopRecord } from "../lib/shop.server";
@@ -13,7 +14,46 @@ const Schema = z.object({
   trafficSplitA: z.coerce.number().min(1).max(99),
   selectorA: z.string().min(2),
   selectorB: z.string().min(2),
+  startsAt: z.string().optional(),
+  endsAt: z.string().optional(),
+  assignmentMode: z.nativeEnum(AssignmentMode).default(AssignmentMode.STICKY),
+  assignmentTtlDays: z.union([z.literal(""), z.coerce.number().int().min(1).max(365)]).optional(),
+  audienceRule: z.nativeEnum(AudienceRule).default(AudienceRule.ALL_VISITORS),
+}).superRefine((data, ctx) => {
+  if (data.endsAt && !data.startsAt) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["endsAt"],
+      message: "Set a start time when an end time is provided.",
+    });
+  }
+
+  if (data.startsAt && data.endsAt) {
+    const start = new Date(data.startsAt);
+    const end = new Date(data.endsAt);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["endsAt"],
+        message: "End time must be later than start time.",
+      });
+    }
+  }
+
+  if (data.assignmentMode === AssignmentMode.SESSION && data.assignmentTtlDays && data.assignmentTtlDays !== "") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["assignmentTtlDays"],
+      message: "TTL is only used for sticky assignment mode.",
+    });
+  }
 });
+
+function parseDate(value?: string) {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
 export async function action({ request }: ActionFunctionArgs) {
   const shop = await requireShopRecord(request);
@@ -25,7 +65,23 @@ export async function action({ request }: ActionFunctionArgs) {
     return json({ ok: false, errors: parsed.error.flatten() }, { status: 400 });
   }
 
-  const experiment = await createExperiment({ shopId: shop.id, ...parsed.data });
+  const startsAt = parseDate(parsed.data.startsAt);
+  const endsAt = parseDate(parsed.data.endsAt);
+  const shouldAutoActivate = Boolean(startsAt || endsAt);
+
+  const experiment = await createExperiment({
+    shopId: shop.id,
+    ...parsed.data,
+    startsAt,
+    endsAt,
+    status: shouldAutoActivate ? ExperimentStatus.ACTIVE : ExperimentStatus.DRAFT,
+    assignmentMode: parsed.data.assignmentMode,
+    assignmentTtlDays:
+      parsed.data.assignmentTtlDays === "" || parsed.data.assignmentTtlDays == null
+        ? null
+        : parsed.data.assignmentTtlDays,
+    audienceRule: parsed.data.audienceRule,
+  });
   return redirect(`/app/experiments/${experiment.id}`);
 }
 
@@ -34,6 +90,15 @@ const TARGET_OPTIONS = [
   { label: "Template", value: "TEMPLATE" },
   { label: "Path prefix", value: "PATH_PREFIX" },
   { label: "Exact path", value: "EXACT_PATH" },
+];
+const ASSIGNMENT_MODE_OPTIONS = [
+  { label: "Sticky (recommended)", value: AssignmentMode.STICKY },
+  { label: "Per session", value: AssignmentMode.SESSION },
+];
+const AUDIENCE_RULE_OPTIONS = [
+  { label: "All visitors", value: AudienceRule.ALL_VISITORS },
+  { label: "New visitors only", value: AudienceRule.NEW_VISITORS },
+  { label: "Returning visitors only", value: AudienceRule.RETURNING_VISITORS },
 ];
 
 type ErrorData = { ok: false; errors: { fieldErrors: Record<string, string[]> } };
@@ -54,6 +119,11 @@ export default function NewExperimentPage() {
     trafficSplitA: "50",
     selectorA: "",
     selectorB: "",
+    startsAt: "",
+    endsAt: "",
+    assignmentMode: AssignmentMode.STICKY,
+    assignmentTtlDays: "",
+    audienceRule: AudienceRule.ALL_VISITORS,
   });
   const setField =
     (field: keyof typeof formValues) =>
@@ -134,6 +204,54 @@ export default function NewExperimentPage() {
               autoComplete="off"
               placeholder="#section-hero-variant"
               error={fieldError(errors, "selectorB")}
+            />
+            <TextField
+              label="Start at (optional)"
+              name="startsAt"
+              value={formValues.startsAt}
+              onChange={setField("startsAt")}
+              type="datetime-local"
+              autoComplete="off"
+              helpText="If set, this test auto-activates and starts at this time."
+              error={fieldError(errors, "startsAt")}
+            />
+            <TextField
+              label="End at (optional)"
+              name="endsAt"
+              value={formValues.endsAt}
+              onChange={setField("endsAt")}
+              type="datetime-local"
+              autoComplete="off"
+              helpText="Optional stop time. Must be after start."
+              error={fieldError(errors, "endsAt")}
+            />
+            <Select
+              label="Assignment frequency"
+              name="assignmentMode"
+              options={ASSIGNMENT_MODE_OPTIONS}
+              value={formValues.assignmentMode}
+              onChange={setField("assignmentMode")}
+            />
+            {formValues.assignmentMode === AssignmentMode.STICKY ? (
+              <TextField
+                label="Re-randomize after N days (optional)"
+                name="assignmentTtlDays"
+                value={formValues.assignmentTtlDays}
+                onChange={setField("assignmentTtlDays")}
+                type="number"
+                autoComplete="off"
+                min={1}
+                max={365}
+                helpText="Leave blank to keep the same assignment forever."
+                error={fieldError(errors, "assignmentTtlDays")}
+              />
+            ) : null}
+            <Select
+              label="Audience rule"
+              name="audienceRule"
+              options={AUDIENCE_RULE_OPTIONS}
+              value={formValues.audienceRule}
+              onChange={setField("audienceRule")}
             />
             <ButtonGroup>
               <Button submit variant="primary" loading={isSubmitting}>

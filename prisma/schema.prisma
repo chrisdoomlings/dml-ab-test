@@ -44,6 +44,9 @@ model Experiment {
   targetType        TargetType          @default(ALL_PAGES)
   targetValue       String?
   trafficSplitA     Int                 @default(50)
+  assignmentMode    AssignmentMode      @default(STICKY)
+  assignmentTtlDays Int?
+  audienceRule      AudienceRule        @default(ALL_VISITORS)
   status            ExperimentStatus    @default(DRAFT)
   startsAt          DateTime?
   endsAt            DateTime?
@@ -129,6 +132,17 @@ enum ExperimentStatus {
   ACTIVE
   PAUSED
   STOPPED
+}
+
+enum AssignmentMode {
+  STICKY
+  SESSION
+}
+
+enum AudienceRule {
+  ALL_VISITORS
+  NEW_VISITORS
+  RETURNING_VISITORS
 }
 
 enum TargetType {

@@ -20,7 +20,7 @@ export default function SettingsPage() {
             <List>
               <List.Item>Shop domain: {shop.shopDomain}</List.Item>
               <List.Item>Theme app extension: enabled in theme editor</List.Item>
-              <List.Item>Assignment storage: localStorage</List.Item>
+              <List.Item>Assignment storage: localStorage + cookie backup</List.Item>
               <List.Item>Fail-open behavior: Variant A visible</List.Item>
             </List>
           </BlockStack>

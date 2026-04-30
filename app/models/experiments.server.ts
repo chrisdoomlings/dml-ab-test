@@ -1,4 +1,4 @@
-import { ExperimentStatus, type Prisma, type VariantKey } from "@prisma/client";
+import { AudienceRule, AssignmentMode, ExperimentStatus, type Prisma, type VariantKey } from "@prisma/client";
 import { prisma } from "../lib/db.server";
 
 export function listExperiments(shopId: string) {
@@ -17,6 +17,12 @@ export function createExperiment(input: {
   trafficSplitA: number;
   selectorA: string;
   selectorB: string;
+  startsAt?: Date | null;
+  endsAt?: Date | null;
+  status?: ExperimentStatus;
+  assignmentMode?: AssignmentMode;
+  assignmentTtlDays?: number | null;
+  audienceRule?: AudienceRule;
 }) {
   return prisma.experiment.create({
     data: {
@@ -25,6 +31,12 @@ export function createExperiment(input: {
       targetType: input.targetType,
       targetValue: input.targetValue,
       trafficSplitA: input.trafficSplitA,
+      startsAt: input.startsAt ?? null,
+      endsAt: input.endsAt ?? null,
+      status: input.status ?? ExperimentStatus.DRAFT,
+      assignmentMode: input.assignmentMode ?? AssignmentMode.STICKY,
+      assignmentTtlDays: input.assignmentTtlDays ?? null,
+      audienceRule: input.audienceRule ?? AudienceRule.ALL_VISITORS,
       variants: {
         create: [
           { key: "A", selector: input.selectorA },
@@ -62,7 +74,7 @@ export function deleteExperiment(input: { id: string; shopId: string }) {
   });
 }
 
-export async function getActiveExperimentsForPath(shopId: string, path: string, template?: string) {
+export async function getActiveExperimentsForPath(shopId: string, path: string, template?: string, isReturning?: boolean) {
   const now = new Date();
   const active = await prisma.experiment.findMany({
     where: {
@@ -71,6 +83,13 @@ export async function getActiveExperimentsForPath(shopId: string, path: string, 
       AND: [
         { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
         { OR: [{ endsAt: null }, { endsAt: { gt: now } }] },
+        {
+          OR: [
+            { audienceRule: AudienceRule.ALL_VISITORS },
+            ...(isReturning === true ? [{ audienceRule: AudienceRule.RETURNING_VISITORS }] : []),
+            ...(isReturning === false ? [{ audienceRule: AudienceRule.NEW_VISITORS }] : []),
+          ],
+        },
       ],
       OR: [
         { targetType: "ALL_PAGES" },
@@ -88,23 +107,52 @@ export async function getActiveExperimentsForPath(shopId: string, path: string, 
   });
 }
 
-export async function assignVariant(experimentId: string, visitorId: string, splitA: number): Promise<VariantKey> {
+export async function assignVariant(input: {
+  experimentId: string;
+  visitorId: string;
+  splitA: number;
+  assignmentMode: AssignmentMode;
+  assignmentTtlDays?: number | null;
+  sessionId?: string;
+}): Promise<VariantKey> {
   const existing = await prisma.visitorAssignment.findUnique({
     where: { experimentId_visitorId: { experimentId, visitorId } },
   });
 
-  if (existing) return existing.variantKey;
+  if (existing) {
+    const createdAtMs = new Date(existing.createdAt).getTime();
+    const ttlDays = input.assignmentTtlDays ?? null;
+    const ttlExpired = ttlDays && ttlDays > 0
+      ? Date.now() - createdAtMs > ttlDays * 24 * 60 * 60 * 1000
+      : false;
+    const sessionMismatch =
+      input.assignmentMode === AssignmentMode.SESSION &&
+      Boolean(input.sessionId) &&
+      existing.sessionId &&
+      existing.sessionId !== input.sessionId;
+
+    if (!ttlExpired && !sessionMismatch) {
+      return existing.variantKey;
+    }
+  }
 
   const roll = Math.random() * 100;
-  const variantKey: VariantKey = roll < splitA ? "A" : "B";
+  const variantKey: VariantKey = roll < input.splitA ? "A" : "B";
 
   try {
-    await prisma.visitorAssignment.create({
-      data: { experimentId, visitorId, variantKey },
+    await prisma.visitorAssignment.upsert({
+      where: { experimentId_visitorId: { experimentId: input.experimentId, visitorId: input.visitorId } },
+      update: { variantKey, sessionId: input.sessionId ?? null },
+      create: {
+        experimentId: input.experimentId,
+        visitorId: input.visitorId,
+        variantKey,
+        sessionId: input.sessionId ?? null,
+      },
     });
   } catch {
     const concurrent = await prisma.visitorAssignment.findUnique({
-      where: { experimentId_visitorId: { experimentId, visitorId } },
+      where: { experimentId_visitorId: { experimentId: input.experimentId, visitorId: input.visitorId } },
     });
     if (concurrent) return concurrent.variantKey;
     throw new Error("Unable to assign experiment variant");

@@ -19,16 +19,25 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const shopDomain = requireParam(url, "shop");
   const path = requireParam(url, "path");
   const visitorId = requireParam(url, "visitorId");
+  const sessionId = url.searchParams.get("sessionId") ?? undefined;
+  const isReturning = url.searchParams.get("isReturning") === "1";
   const template = url.searchParams.get("template") ?? undefined;
 
   const shop = await prisma.shop.findUnique({ where: { shopDomain } });
   if (!shop) return json({ experiments: [] }, { headers: corsHeaders });
 
-  const experiments = await getActiveExperimentsForPath(shop.id, path, template);
+  const experiments = await getActiveExperimentsForPath(shop.id, path, template, isReturning);
 
   const withAssignments = await Promise.all(
     experiments.map(async (experiment) => {
-      const variant = await assignVariant(experiment.id, visitorId, experiment.trafficSplitA);
+      const variant = await assignVariant({
+        experimentId: experiment.id,
+        visitorId,
+        splitA: experiment.trafficSplitA,
+        assignmentMode: experiment.assignmentMode,
+        assignmentTtlDays: experiment.assignmentTtlDays,
+        sessionId,
+      });
       const variantSelectors = experiment.variants.reduce<Record<string, string>>((acc, v) => {
         acc[v.key] = v.selector;
         return acc;

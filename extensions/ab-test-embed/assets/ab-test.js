@@ -3,9 +3,13 @@
   if (!cfg || !cfg.appBaseUrl || !cfg.shopDomain) return;
 
   var VISITOR_KEY = "dml_ab_vid";
+  var SESSION_KEY = "dml_ab_sid";
+  var RETURNING_KEY = "dml_ab_seen";
   var ASSIGNMENTS_KEY = "dml_ab_assignments";
   var EXPERIMENTS_KEY = "dml_ab_experiments";
   var visitorId = getOrCreateVisitorId();
+  var sessionId = getOrCreateSessionId();
+  var isReturningVisitor = readReturningFlag();
   var ASSIGNMENT_COOKIE = "dml_ab_assignments";
 
   function getOrCreateVisitorId() {
@@ -17,6 +21,34 @@
       return generated;
     } catch (e) {
       return "anon_" + Date.now().toString(36);
+    }
+  }
+
+  function getOrCreateSessionId() {
+    try {
+      var existing = sessionStorage.getItem(SESSION_KEY);
+      if (existing) return existing;
+      var generated = "s_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      sessionStorage.setItem(SESSION_KEY, generated);
+      return generated;
+    } catch (e) {
+      return "session_" + Date.now().toString(36);
+    }
+  }
+
+  function readReturningFlag() {
+    try {
+      return localStorage.getItem(RETURNING_KEY) === "1";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function markVisitorSeen() {
+    try {
+      localStorage.setItem(RETURNING_KEY, "1");
+    } catch (e) {
+      // noop
     }
   }
 
@@ -187,7 +219,11 @@
       "&template=" +
       encodeURIComponent(cfg.template || "") +
       "&visitorId=" +
-      encodeURIComponent(visitorId),
+      encodeURIComponent(visitorId) +
+      "&sessionId=" +
+      encodeURIComponent(sessionId) +
+      "&isReturning=" +
+      (isReturningVisitor ? "1" : "0"),
     {
       credentials: "omit",
       cache: "no-store",
@@ -206,6 +242,7 @@
       saveCachedExperiments(liveExperiments);
       saveAssignments(assignments);
       setCartAttributes(assignments);
+      markVisitorSeen();
     })
     .catch(function () {
       // fail-open: theme default section remains visible
