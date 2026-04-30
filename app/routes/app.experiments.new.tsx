@@ -1,5 +1,6 @@
 import { json, redirect, type ActionFunctionArgs } from "@remix-run/node";
 import { Form, useActionData, useNavigation } from "@remix-run/react";
+import { Banner, BlockStack, Button, ButtonGroup, Card, FormLayout, Page, Select, TextField } from "@shopify/polaris";
 import { z } from "zod";
 import { createExperiment } from "../models/experiments.server";
 import { requireShopRecord } from "../lib/shop.server";
@@ -23,11 +24,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return json({ ok: false, errors: parsed.error.flatten() }, { status: 400 });
   }
 
-  const experiment = await createExperiment({
-    shopId: shop.id,
-    ...parsed.data,
-  });
-
+  const experiment = await createExperiment({ shopId: shop.id, ...parsed.data });
   return redirect(`/app/experiments/${experiment.id}`);
 }
 
@@ -37,63 +34,53 @@ export default function NewExperimentPage() {
   const isSubmitting = navigation.state === "submitting";
 
   return (
-    <div className="form-shell">
-      <div className="page-header">
-        <div>
-          <div className="eyebrow">New test</div>
-          <h1 className="page-title">Create an experiment</h1>
-          <p className="page-subtitle">Launch a page, template, or selector-based split test with analytics tracking.</p>
-        </div>
-      </div>
-
-      <Form method="post" className="form-card">
-        <div className="settings-grid">
-          <label>
-            <div className="metric-label">Experiment name</div>
-            <input className="field-input" name="name" autoComplete="off" placeholder="Homepage hero image test" />
-          </label>
-          <label>
-            <div className="metric-label">Traffic split for Variant A</div>
-            <input className="field-input" name="trafficSplitA" type="number" min={1} max={99} defaultValue={50} />
-          </label>
-          <label>
-            <div className="metric-label">Target type</div>
-            <select className="field-input" name="targetType" defaultValue="ALL_PAGES">
-              <option value="ALL_PAGES">All pages</option>
-              <option value="TEMPLATE">Template</option>
-              <option value="PATH_PREFIX">Path prefix</option>
-              <option value="EXACT_PATH">Exact path</option>
-            </select>
-          </label>
-          <label>
-            <div className="metric-label">Target value</div>
-            <input className="field-input" name="targetValue" autoComplete="off" placeholder="product, /collections/sale, /products/item" />
-          </label>
-          <label>
-            <div className="metric-label">Original selector</div>
-            <input className="field-input" name="selectorA" autoComplete="off" placeholder="#section-hero-original" />
-          </label>
-          <label>
-            <div className="metric-label">Variant selector</div>
-            <input className="field-input" name="selectorB" autoComplete="off" placeholder="#section-hero-variant" />
-          </label>
-        </div>
-
-        {actionData && !actionData.ok ? (
-          <p className="page-subtitle" style={{ color: "#a92045" }}>
-            Please fix validation errors and retry.
-          </p>
-        ) : null}
-
-        <div className="button-row" style={{ marginTop: 22 }}>
-          <button className="button-primary" type="submit" disabled={isSubmitting}>
-            Save experiment
-          </button>
-          <a className="button-secondary" href="/app">
-            Cancel
-          </a>
-        </div>
-      </Form>
-    </div>
+    <Page title="Create test" subtitle="Launch a selector-based A/B test with analytics tracking." backAction={{ content: "Tests", url: "/app" }}>
+      <Card>
+        <BlockStack gap="400">
+          {actionData && !actionData.ok ? (
+            <Banner tone="critical">Please fix validation errors and retry.</Banner>
+          ) : null}
+          <Form method="post">
+            <FormLayout>
+              <TextField label="Experiment name" name="name" autoComplete="off" placeholder="Homepage hero image test" />
+              <Select
+                label="Target type"
+                name="targetType"
+                options={[
+                  { label: "All pages", value: "ALL_PAGES" },
+                  { label: "Template", value: "TEMPLATE" },
+                  { label: "Path prefix", value: "PATH_PREFIX" },
+                  { label: "Exact path", value: "EXACT_PATH" },
+                ]}
+              />
+              <TextField
+                label="Target value"
+                name="targetValue"
+                autoComplete="off"
+                helpText="Example: product, /collections/sale, /products/my-item"
+              />
+              <TextField
+                label="Traffic split for Variant A"
+                name="trafficSplitA"
+                autoComplete="off"
+                type="number"
+                min={1}
+                max={99}
+                defaultValue="50"
+                suffix="%"
+              />
+              <TextField label="Original selector / section ID" name="selectorA" autoComplete="off" placeholder="#section-hero-original" />
+              <TextField label="Variant selector / section ID" name="selectorB" autoComplete="off" placeholder="#section-hero-variant" />
+              <ButtonGroup>
+                <Button submit variant="primary" loading={isSubmitting}>
+                  Save experiment
+                </Button>
+                <Button url="/app">Cancel</Button>
+              </ButtonGroup>
+            </FormLayout>
+          </Form>
+        </BlockStack>
+      </Card>
+    </Page>
   );
 }

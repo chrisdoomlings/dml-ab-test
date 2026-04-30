@@ -1,5 +1,6 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
-import { Link, useLoaderData } from "@remix-run/react";
+import { useLoaderData } from "@remix-run/react";
+import { Badge, BlockStack, Button, Card, InlineGrid, InlineStack, Page, Text } from "@shopify/polaris";
 import { listExperimentAnalytics } from "../lib/analytics.server";
 import { requireShopRecord } from "../lib/shop.server";
 
@@ -11,90 +12,47 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 const ideas = [
-  {
-    title: "Homepage hero offer test",
-    metric: "CVR",
-    target: "Homepage",
-    lift: "+8% to +18%",
-    detail: "Compare benefit-led hero copy against product-led hero copy with the same traffic split.",
-  },
-  {
-    title: "Collection product-card density",
-    metric: "CTR",
-    target: "Collection page",
-    lift: "+5% to +12%",
-    detail: "Test compact cards against larger visual cards to see which layout drives more product visits.",
-  },
-  {
-    title: "Sticky add-to-cart proof point",
-    metric: "ATC",
-    target: "Product page",
-    lift: "+4% to +10%",
-    detail: "Add delivery, returns, or guarantee messaging near the purchase action.",
-  },
-  {
-    title: "Announcement bar urgency",
-    metric: "RPV",
-    target: "All pages",
-    lift: "+3% to +9%",
-    detail: "Compare a simple free-shipping threshold against time-limited promotion copy.",
-  },
+  ["Homepage hero offer test", "CVR", "Homepage", "+8% to +18%"],
+  ["Collection product-card density", "CTR", "Collection page", "+5% to +12%"],
+  ["Sticky add-to-cart proof point", "ATC", "Product page", "+4% to +10%"],
+  ["Announcement bar urgency", "RPV", "All pages", "+3% to +9%"],
 ];
 
 export default function AssistPage() {
   const { liveCount } = useLoaderData<typeof loader>();
 
   return (
-    <>
-      <div className="page-header">
-        <div>
-          <div className="eyebrow">Lift Assist</div>
-          <h1 className="page-title">Testing roadmap</h1>
-          <p className="page-subtitle">Prioritized ideas for conversion, product discovery, and revenue-per-visitor gains.</p>
-        </div>
-        <Link className="button-primary" to="/app/experiments/new">
-          Build from idea
-        </Link>
-      </div>
+    <Page
+      title="Lift Assist"
+      subtitle="Prioritized test ideas for conversion, product discovery, and revenue-per-visitor gains."
+      primaryAction={{ content: "Create test", url: "/app/experiments/new" }}
+    >
+      <BlockStack gap="400">
+        <InlineGrid columns={{ xs: 1, sm: 2, md: 4 }} gap="300">
+          <Card><BlockStack gap="200"><Text as="p" tone="subdued">Live coverage</Text><Text as="p" variant="headingLg">{liveCount}</Text><Text as="p" tone="subdued">Active tests running</Text></BlockStack></Card>
+          <Card><BlockStack gap="200"><Text as="p" tone="subdued">Recommended queue</Text><Text as="p" variant="headingLg">{ideas.length}</Text><Text as="p" tone="subdued">Ready to launch</Text></BlockStack></Card>
+          <Card><BlockStack gap="200"><Text as="p" tone="subdued">Primary focus</Text><Text as="p" variant="headingLg">CVR</Text><Text as="p" tone="subdued">Conversion rate</Text></BlockStack></Card>
+          <Card><BlockStack gap="200"><Text as="p" tone="subdued">Next review</Text><Text as="p" variant="headingLg">7d</Text><Text as="p" tone="subdued">After sample growth</Text></BlockStack></Card>
+        </InlineGrid>
 
-      <section className="metric-grid">
-        <div className="metric-card">
-          <div className="metric-label">Live coverage</div>
-          <div className="metric-value">{liveCount}</div>
-          <div className="metric-delta">Active tests running</div>
-        </div>
-        <div className="metric-card">
-          <div className="metric-label">Recommended queue</div>
-          <div className="metric-value">{ideas.length}</div>
-          <div className="metric-delta">Ready to launch</div>
-        </div>
-        <div className="metric-card">
-          <div className="metric-label">Primary focus</div>
-          <div className="metric-value">CVR</div>
-          <div className="metric-delta">Conversion rate</div>
-        </div>
-        <div className="metric-card">
-          <div className="metric-label">Next review</div>
-          <div className="metric-value">7d</div>
-          <div className="metric-delta">After sample growth</div>
-        </div>
-      </section>
-
-      <section className="insight-grid">
-        {ideas.map((idea) => (
-          <article className="insight-card" key={idea.title}>
-            <div className="variant-header">
-              <strong>{idea.title}</strong>
-              <span className="lift-chip">{idea.lift}</span>
-            </div>
-            <div className="test-meta">
-              <span className="chip">{idea.target}</span>
-              <span className="chip">{idea.metric}</span>
-            </div>
-            <p className="page-subtitle">{idea.detail}</p>
-          </article>
-        ))}
-      </section>
-    </>
+        <InlineGrid columns={{ xs: 1, md: 2 }} gap="300">
+          {ideas.map(([title, metric, target, lift]) => (
+            <Card key={title}>
+              <BlockStack gap="300">
+                <InlineStack align="space-between" blockAlign="center">
+                  <Text as="h2" variant="headingMd">{title}</Text>
+                  <Badge tone="success">{lift}</Badge>
+                </InlineStack>
+                <InlineStack gap="200">
+                  <Badge>{target}</Badge>
+                  <Badge>{metric}</Badge>
+                </InlineStack>
+                <Button url="/app/experiments/new">Build test</Button>
+              </BlockStack>
+            </Card>
+          ))}
+        </InlineGrid>
+      </BlockStack>
+    </Page>
   );
 }

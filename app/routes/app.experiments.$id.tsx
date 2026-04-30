@@ -1,6 +1,7 @@
 import { json, redirect, type ActionFunctionArgs, type LoaderFunctionArgs } from "@remix-run/node";
-import { Form, Link, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form, useLoaderData, useNavigation } from "@remix-run/react";
 import { ExperimentStatus } from "@prisma/client";
+import { Badge, BlockStack, Box, Button, ButtonGroup, Card, InlineGrid, InlineStack, Page, Text } from "@shopify/polaris";
 import { deleteExperiment, getExperimentSummary, updateExperimentStatus } from "../models/experiments.server";
 import { summarizeExperiment } from "../lib/analytics.server";
 import { money, percent, signedPercent } from "../lib/format";
@@ -36,11 +37,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   if (["DRAFT", "ACTIVE", "PAUSED", "STOPPED"].includes(intent)) {
-    await updateExperimentStatus({
-      id,
-      shopId: shop.id,
-      status: intent as ExperimentStatus,
-    });
+    await updateExperimentStatus({ id, shopId: shop.id, status: intent as ExperimentStatus });
     return redirect(`/app/experiments/${id}`);
   }
 
@@ -58,20 +55,64 @@ function MiniChart({ cvrA, cvrB }: { cvrA: number; cvrB: number }) {
     points.map((point, index) => `${index === 0 ? "M" : "L"} ${24 + index * 118} ${28 + point * 128}`).join(" ");
 
   return (
-    <svg className="chart" viewBox="0 0 660 220" role="img" aria-label="Conversion rate trend">
-      {[40, 90, 140, 190].map((y) => (
-        <line key={y} x1="24" x2="636" y1={y} y2={y} stroke="#dfe3e8" strokeDasharray="5 5" />
-      ))}
+    <svg className="native-chart" viewBox="0 0 660 220" role="img" aria-label="Conversion rate trend">
+      {[40, 90, 140, 190].map((y) => <line key={y} x1="24" x2="636" y1={y} y2={y} stroke="#dfe3e8" strokeDasharray="5 5" />)}
       <path d={toPath(pointsA)} fill="none" stroke="#111111" strokeWidth="3" />
-      <path d={toPath(pointsB)} fill="none" stroke="#3d7cff" strokeWidth="3" />
-      <circle cx="614" cy={28 + pointsB[5] * 128} r="5" fill="#3d7cff" />
-      <text x="24" y="212" fill="#656b73" fontSize="13">
-        Day 1
-      </text>
-      <text x="560" y="212" fill="#656b73" fontSize="13">
-        Today
-      </text>
+      <path d={toPath(pointsB)} fill="none" stroke="#005bd3" strokeWidth="3" />
+      <circle cx="614" cy={28 + pointsB[5] * 128} r="5" fill="#005bd3" />
     </svg>
+  );
+}
+
+function MetricCard({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <Card>
+      <BlockStack gap="200">
+        <Text as="p" tone="subdued">{label}</Text>
+        <Text as="p" variant="headingLg">{value}</Text>
+        <Text as="p" tone="subdued">{detail}</Text>
+      </BlockStack>
+    </Card>
+  );
+}
+
+function VariantCard({
+  title,
+  probability,
+  selector,
+  variant,
+  visitors,
+  ctr,
+  atc,
+  rpv,
+}: {
+  title: string;
+  probability: number;
+  selector: string;
+  variant: "A" | "B";
+  visitors: number;
+  ctr: number;
+  atc: number;
+  rpv: number;
+}) {
+  return (
+    <Card>
+      <BlockStack gap="300">
+        <InlineStack align="space-between" blockAlign="center">
+          <Text as="h2" variant="headingMd">{title}</Text>
+          <Badge tone={probability >= 85 ? "success" : undefined}>Probability to win: {probability}%</Badge>
+        </InlineStack>
+        <div className={`variant-preview ${variant === "B" ? "variant-b" : ""}`}>
+          <span className="preview-label">{selector}</span>
+        </div>
+        <InlineGrid columns={2} gap="300">
+          <Text as="p" tone="subdued">Visitors<br /><Text as="span" fontWeight="semibold">{visitors.toLocaleString()}</Text></Text>
+          <Text as="p" tone="subdued">CTR<br /><Text as="span" fontWeight="semibold">{percent(ctr)}</Text></Text>
+          <Text as="p" tone="subdued">Add to cart<br /><Text as="span" fontWeight="semibold">{percent(atc)}</Text></Text>
+          <Text as="p" tone="subdued">RPV<br /><Text as="span" fontWeight="semibold">{money(rpv)}</Text></Text>
+        </InlineGrid>
+      </BlockStack>
+    </Card>
   );
 }
 
@@ -83,106 +124,56 @@ export default function ExperimentDetailsPage() {
   const probabilityA = 100 - probabilityB;
 
   return (
-    <>
-      <div className="page-header">
-        <div>
-          <div className="eyebrow">Test overview</div>
-          <h1 className="page-title">{experiment.name}</h1>
-          <p className="page-subtitle">
-            {experiment.statusLabel} test on {experiment.targetValue || experiment.targetType.toLowerCase().replace("_", " ")}
-          </p>
-        </div>
-        <Form method="post" className="button-row">
-          <button className="button-secondary" name="intent" value="ACTIVE" disabled={isSubmitting || experiment.status === "ACTIVE"}>
-            Activate
-          </button>
-          <button className="button-secondary" name="intent" value="PAUSED" disabled={isSubmitting || experiment.status === "PAUSED"}>
-            Pause
-          </button>
-          <button className="button-secondary" name="intent" value="STOPPED" disabled={isSubmitting || experiment.status === "STOPPED"}>
-            Stop
-          </button>
-          <button className="button-danger" name="intent" value="delete" disabled={isSubmitting}>
-            Delete
-          </button>
-        </Form>
-      </div>
+    <Page
+      title={experiment.name}
+      subtitle={`${experiment.statusLabel} test on ${experiment.targetValue || experiment.targetType.toLowerCase().replace("_", " ")}`}
+      backAction={{ content: "Tests", url: "/app" }}
+    >
+      <BlockStack gap="400">
+        <Card>
+          <InlineStack align="space-between" blockAlign="center">
+            <InlineStack gap="200" blockAlign="center">
+              <Badge tone={experiment.status === "ACTIVE" ? "success" : undefined}>{experiment.statusLabel}</Badge>
+              <Text as="p" tone="subdued">A {experiment.trafficSplitA}% / B {100 - experiment.trafficSplitA}%</Text>
+            </InlineStack>
+            <Form method="post">
+              <ButtonGroup>
+                <Button submit name="intent" value="ACTIVE" disabled={isSubmitting || experiment.status === "ACTIVE"}>Activate</Button>
+                <Button submit name="intent" value="PAUSED" disabled={isSubmitting || experiment.status === "PAUSED"}>Pause</Button>
+                <Button submit name="intent" value="STOPPED" disabled={isSubmitting || experiment.status === "STOPPED"}>Stop</Button>
+                <Button submit name="intent" value="delete" tone="critical" disabled={isSubmitting}>Delete</Button>
+              </ButtonGroup>
+            </Form>
+          </InlineStack>
+        </Card>
 
-      <section className="metric-grid">
-        <div className="metric-card">
-          <div className="metric-label">Visitors</div>
-          <div className="metric-value">{experiment.visitors.toLocaleString()}</div>
-          <div className="metric-delta">A {experiment.visitorsA.toLocaleString()} / B {experiment.visitorsB.toLocaleString()}</div>
-        </div>
-        <div className="metric-card">
-          <div className="metric-label">Lift</div>
-          <div className="metric-value">{signedPercent(experiment.cvrLift)}</div>
-          <div className="metric-delta">Conversion rate goal</div>
-        </div>
-        <div className="metric-card">
-          <div className="metric-label">Progress</div>
-          <div className="metric-value">{experiment.certaintyScore >= 85 ? "Significant" : "Learning"}</div>
-          <div className="metric-delta">{experiment.certaintyScore}% certainty</div>
-        </div>
-        <div className="metric-card">
-          <div className="metric-label">Revenue</div>
-          <div className="metric-value">{money(experiment.revenueA + experiment.revenueB)}</div>
-          <div className="metric-delta">Orders data after approval</div>
-        </div>
-      </section>
+        <InlineGrid columns={{ xs: 1, sm: 2, md: 4 }} gap="300">
+          <MetricCard label="Visitors" value={experiment.visitors.toLocaleString()} detail={`A ${experiment.visitorsA.toLocaleString()} / B ${experiment.visitorsB.toLocaleString()}`} />
+          <MetricCard label="Lift" value={signedPercent(experiment.cvrLift)} detail="Conversion rate goal" />
+          <MetricCard label="Progress" value={experiment.certaintyScore >= 85 ? "Significant" : "Learning"} detail={`${experiment.certaintyScore}% certainty`} />
+          <MetricCard label="Revenue" value={money(experiment.revenueA + experiment.revenueB)} detail="Orders data after approval" />
+        </InlineGrid>
 
-      <section className="panel">
-        <div className="panel-header">
-          <div className="panel-title">Conversion rate</div>
-          <div className="test-meta">
-            <span className="chip">Original {percent(experiment.cvrA)}</span>
-            <span className="chip">Variant {percent(experiment.cvrB)}</span>
-          </div>
-        </div>
-        <div className="chart-wrap">
-          <MiniChart cvrA={experiment.cvrA} cvrB={experiment.cvrB} />
-        </div>
-      </section>
+        <Card>
+          <BlockStack gap="300">
+            <InlineStack align="space-between">
+              <Text as="h2" variant="headingMd">Conversion rate</Text>
+              <InlineStack gap="200">
+                <Badge>Original {percent(experiment.cvrA)}</Badge>
+                <Badge>Variant {percent(experiment.cvrB)}</Badge>
+              </InlineStack>
+            </InlineStack>
+            <Box paddingBlockStart="200">
+              <MiniChart cvrA={experiment.cvrA} cvrB={experiment.cvrB} />
+            </Box>
+          </BlockStack>
+        </Card>
 
-      <section className="variants-grid">
-        <div className="variant-card">
-          <div className="variant-header">
-            <strong>Original</strong>
-            <span className="status-chip">Probability to win: {probabilityA}%</span>
-          </div>
-          <div className="variant-preview">
-            <span className="preview-label">{selectorFor(experiment, "A")}</span>
-          </div>
-          <div className="stat-list">
-            <div className="stat-row"><span>Visitors</span><strong>{experiment.visitorsA.toLocaleString()}</strong></div>
-            <div className="stat-row"><span>CTR</span><strong>{percent(experiment.ctrA)}</strong></div>
-            <div className="stat-row"><span>Add-to-cart rate</span><strong>{percent(experiment.atcA)}</strong></div>
-            <div className="stat-row"><span>RPV</span><strong>{money(experiment.rpvA)}</strong></div>
-          </div>
-        </div>
-
-        <div className="variant-card">
-          <div className="variant-header">
-            <strong>Variant</strong>
-            <span className="status-chip significant">Probability to win: {probabilityB}%</span>
-          </div>
-          <div className="variant-preview variant-b">
-            <span className="preview-label">{selectorFor(experiment, "B")}</span>
-          </div>
-          <div className="stat-list">
-            <div className="stat-row"><span>Visitors</span><strong>{experiment.visitorsB.toLocaleString()}</strong></div>
-            <div className="stat-row"><span>CTR</span><strong>{percent(experiment.ctrB)}</strong></div>
-            <div className="stat-row"><span>Add-to-cart rate</span><strong>{percent(experiment.atcB)}</strong></div>
-            <div className="stat-row"><span>RPV</span><strong>{money(experiment.rpvB)}</strong></div>
-          </div>
-        </div>
-      </section>
-
-      <div style={{ marginTop: 18 }}>
-        <Link className="button-secondary" to="/app">
-          Back to tests
-        </Link>
-      </div>
-    </>
+        <InlineGrid columns={{ xs: 1, md: 2 }} gap="300">
+          <VariantCard title="Original" probability={probabilityA} selector={selectorFor(experiment, "A")} variant="A" visitors={experiment.visitorsA} ctr={experiment.ctrA} atc={experiment.atcA} rpv={experiment.rpvA} />
+          <VariantCard title="Variant" probability={probabilityB} selector={selectorFor(experiment, "B")} variant="B" visitors={experiment.visitorsB} ctr={experiment.ctrB} atc={experiment.atcB} rpv={experiment.rpvB} />
+        </InlineGrid>
+      </BlockStack>
+    </Page>
   );
 }
