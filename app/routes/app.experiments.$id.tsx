@@ -49,17 +49,19 @@ function selectorFor(experiment: ReturnType<typeof useLoaderData<typeof loader>>
 }
 
 function MiniChart({ cvrA, cvrB }: { cvrA: number; cvrB: number }) {
-  const pointsA = [0.82, 0.9, 0.76, 0.8, 0.87, Math.max(0.18, 0.78 - cvrA * 5)];
-  const pointsB = [0.62, 0.68, 0.72, 0.9, 0.84, Math.max(0.12, 0.74 - cvrB * 5)];
-  const toPath = (points: number[]) =>
-    points.map((point, index) => `${index === 0 ? "M" : "L"} ${24 + index * 118} ${28 + point * 128}`).join(" ");
+  const maxValue = Math.max(cvrA, cvrB, 0.01);
+  const barHeightA = Math.round((cvrA / maxValue) * 120);
+  const barHeightB = Math.round((cvrB / maxValue) * 120);
 
   return (
-    <svg className="native-chart" viewBox="0 0 660 220" role="img" aria-label="Conversion rate trend">
-      {[40, 90, 140, 190].map((y) => <line key={y} x1="24" x2="636" y1={y} y2={y} stroke="#dfe3e8" strokeDasharray="5 5" />)}
-      <path d={toPath(pointsA)} fill="none" stroke="#111111" strokeWidth="3" />
-      <path d={toPath(pointsB)} fill="none" stroke="#005bd3" strokeWidth="3" />
-      <circle cx="614" cy={28 + pointsB[5] * 128} r="5" fill="#005bd3" />
+    <svg className="native-chart" viewBox="0 0 660 220" role="img" aria-label="Conversion rate comparison">
+      {[40, 80, 120, 160].map((y) => <line key={y} x1="24" x2="636" y1={y} y2={y} stroke="#dfe3e8" strokeDasharray="5 5" />)}
+      <rect x="170" y={170 - barHeightA} width="120" height={barHeightA} rx="8" fill="#111111" />
+      <rect x="370" y={170 - barHeightB} width="120" height={barHeightB} rx="8" fill="#005bd3" />
+      <text x="230" y="192" textAnchor="middle" fill="#616161" fontSize="13">Original</text>
+      <text x="430" y="192" textAnchor="middle" fill="#616161" fontSize="13">Variant</text>
+      <text x="230" y={162 - barHeightA} textAnchor="middle" fill="#111111" fontSize="13">{percent(cvrA)}</text>
+      <text x="430" y={162 - barHeightB} textAnchor="middle" fill="#005bd3" fontSize="13">{percent(cvrB)}</text>
     </svg>
   );
 }

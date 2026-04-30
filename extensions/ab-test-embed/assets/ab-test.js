@@ -4,6 +4,7 @@
 
   var VISITOR_KEY = "dml_ab_vid";
   var ASSIGNMENTS_KEY = "dml_ab_assignments";
+  var EXPERIMENTS_KEY = "dml_ab_experiments";
   var visitorId = getOrCreateVisitorId();
 
   function getOrCreateVisitorId() {
@@ -29,6 +30,23 @@
   function saveAssignments(map) {
     try {
       localStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify(map));
+    } catch (e) {
+      // noop
+    }
+  }
+
+  function getCachedExperiments() {
+    try {
+      var cached = JSON.parse(localStorage.getItem(EXPERIMENTS_KEY) || "[]");
+      return Array.isArray(cached) ? cached : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveCachedExperiments(experiments) {
+    try {
+      localStorage.setItem(EXPERIMENTS_KEY, JSON.stringify(experiments || []));
     } catch (e) {
       // noop
     }
@@ -62,26 +80,10 @@
     }).catch(function () {});
   }
 
-  function applyExperiment(exp) {
-    var selectorA = exp.variants.A;
-    var selectorB = exp.variants.B;
-    var nodeA = document.querySelector(selectorA);
-    var nodeB = document.querySelector(selectorB);
-    if (!nodeA || !nodeB) return;
-
-    var showA = exp.variant === "A";
-    nodeA.style.display = showA ? "" : "none";
-    nodeB.style.display = showA ? "none" : "";
-
-    track({
-      experimentId: exp.id,
-      visitorId: visitorId,
-      variantKey: exp.variant,
-      eventType: "IMPRESSION",
-      pagePath: location.pathname,
-    });
-
-    var activeNode = showA ? nodeA : nodeB;
+  function bindClickTracking(activeNode, exp) {
+    var marker = "dml_ab_click_" + exp.id;
+    if (activeNode.getAttribute(marker) === "1") return;
+    activeNode.setAttribute(marker, "1");
     activeNode.addEventListener("click", function () {
       track({
         experimentId: exp.id,
@@ -92,6 +94,37 @@
       });
     });
   }
+
+  function applyExperiment(exp, options) {
+    options = options || {};
+    var selectorA = exp.variants.A;
+    var selectorB = exp.variants.B;
+    var nodeA = document.querySelector(selectorA);
+    var nodeB = document.querySelector(selectorB);
+    if (!nodeA || !nodeB) return;
+
+    var showA = exp.variant === "A";
+    nodeA.style.display = showA ? "" : "none";
+    nodeB.style.display = showA ? "none" : "";
+
+    if (!options.skipImpression) {
+      track({
+        experimentId: exp.id,
+        visitorId: visitorId,
+        variantKey: exp.variant,
+        eventType: "IMPRESSION",
+        pagePath: location.pathname,
+      });
+    }
+
+    var activeNode = showA ? nodeA : nodeB;
+    bindClickTracking(activeNode, exp);
+  }
+
+  // Apply last known assignments immediately to reduce refresh flicker.
+  getCachedExperiments().forEach(function (exp) {
+    applyExperiment(exp, { skipImpression: true });
+  });
 
   fetch(
     cfg.appBaseUrl +
@@ -109,10 +142,12 @@
     })
     .then(function (data) {
       var assignments = getAssignments();
-      (data.experiments || []).forEach(function (exp) {
+      var liveExperiments = data.experiments || [];
+      liveExperiments.forEach(function (exp) {
         assignments[exp.id] = exp.variant;
         applyExperiment(exp);
       });
+      saveCachedExperiments(liveExperiments);
       saveAssignments(assignments);
       setCartAttributes(assignments);
     })

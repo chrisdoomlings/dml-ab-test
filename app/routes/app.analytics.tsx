@@ -15,11 +15,26 @@ export async function loader({ request }: LoaderFunctionArgs) {
   });
 }
 
-function ReportingChart() {
-  const original = [0.74, 0.58, 0.64, 0.49, 0.53, 0.62, 0.7, 0.59, 0.66];
-  const variant = [0.86, 0.78, 0.73, 0.66, 0.44, 0.38, 0.52, 0.61, 0.57];
+function ReportingChart({
+  points,
+}: {
+  points: Array<{ name: string; cvrA: number; cvrB: number }>;
+}) {
+  const rows = points.slice(-8);
+  const maxValue = Math.max(
+    0.01,
+    ...rows.map((row) => Math.max(row.cvrA, row.cvrB)),
+  );
   const toPath = (points: number[]) =>
-    points.map((point, index) => `${index === 0 ? "M" : "L"} ${28 + index * 76} ${26 + point * 150}`).join(" ");
+    points
+      .map((point, index) => {
+        const x = 28 + index * (rows.length > 1 ? 624 / (rows.length - 1) : 0);
+        const y = 192 - (point / maxValue) * 150;
+        return `${index === 0 ? "M" : "L"} ${x} ${y}`;
+      })
+      .join(" ");
+  const original = rows.map((row) => row.cvrA);
+  const variant = rows.map((row) => row.cvrB);
 
   return (
     <svg className="native-chart" viewBox="0 0 680 240" role="img" aria-label="Reporting trend">
@@ -28,8 +43,8 @@ function ReportingChart() {
       ))}
       <path d={toPath(original)} fill="none" stroke="#111111" strokeWidth="3" />
       <path d={toPath(variant)} fill="none" stroke="#005bd3" strokeWidth="3" />
-      <text x="28" y="226" fill="#616161" fontSize="13">Original</text>
-      <text x="112" y="226" fill="#005bd3" fontSize="13">Variant</text>
+      <text x="28" y="226" fill="#616161" fontSize="13">Original CVR</text>
+      <text x="142" y="226" fill="#005bd3" fontSize="13">Variant CVR</text>
     </svg>
   );
 }
@@ -49,6 +64,11 @@ function MetricCard({ label, value, detail }: { label: string; value: string; de
 export default function AnalyticsPage() {
   const { experiments, summary, events } = useLoaderData<typeof loader>();
   const averageLift = summary.tests > 0 ? summary.lift / summary.tests : 0;
+  const chartPoints = experiments.map((experiment) => ({
+    name: experiment.name,
+    cvrA: experiment.cvrA,
+    cvrB: experiment.cvrB,
+  }));
 
   return (
     <Page
@@ -74,7 +94,7 @@ export default function AnalyticsPage() {
                 <Badge>Adds {events.ADD_TO_CART.toLocaleString()}</Badge>
               </InlineStack>
             </InlineStack>
-            <ReportingChart />
+            <ReportingChart points={chartPoints} />
           </BlockStack>
         </Card>
 
