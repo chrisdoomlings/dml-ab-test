@@ -2,10 +2,20 @@ import { json, redirect, type ActionFunctionArgs } from "@remix-run/node";
 import { Form, useActionData, useNavigation } from "@remix-run/react";
 import { useState } from "react";
 import { BlockStack, Button, ButtonGroup, Card, FormLayout, Page, Select, TextField } from "@shopify/polaris";
-import { AudienceRule, AssignmentMode, ExperimentStatus } from "@prisma/client";
 import { z } from "zod";
 import { createExperiment } from "../models/experiments.server";
 import { requireShopRecord } from "../lib/shop.server";
+
+const ASSIGNMENT_MODE = {
+  STICKY: "STICKY",
+  SESSION: "SESSION",
+} as const;
+
+const AUDIENCE_RULE = {
+  ALL_VISITORS: "ALL_VISITORS",
+  NEW_VISITORS: "NEW_VISITORS",
+  RETURNING_VISITORS: "RETURNING_VISITORS",
+} as const;
 
 const Schema = z.object({
   name: z.string().min(3),
@@ -16,9 +26,11 @@ const Schema = z.object({
   selectorB: z.string().min(2),
   startsAt: z.string().optional(),
   endsAt: z.string().optional(),
-  assignmentMode: z.nativeEnum(AssignmentMode).default(AssignmentMode.STICKY),
+  assignmentMode: z.enum([ASSIGNMENT_MODE.STICKY, ASSIGNMENT_MODE.SESSION]).default(ASSIGNMENT_MODE.STICKY),
   assignmentTtlDays: z.union([z.literal(""), z.coerce.number().int().min(1).max(365)]).optional(),
-  audienceRule: z.nativeEnum(AudienceRule).default(AudienceRule.ALL_VISITORS),
+  audienceRule: z
+    .enum([AUDIENCE_RULE.ALL_VISITORS, AUDIENCE_RULE.NEW_VISITORS, AUDIENCE_RULE.RETURNING_VISITORS])
+    .default(AUDIENCE_RULE.ALL_VISITORS),
 }).superRefine((data, ctx) => {
   if (data.endsAt && !data.startsAt) {
     ctx.addIssue({
@@ -40,7 +52,7 @@ const Schema = z.object({
     }
   }
 
-  if (data.assignmentMode === AssignmentMode.SESSION && data.assignmentTtlDays && data.assignmentTtlDays !== "") {
+  if (data.assignmentMode === ASSIGNMENT_MODE.SESSION && data.assignmentTtlDays && data.assignmentTtlDays !== "") {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["assignmentTtlDays"],
@@ -74,7 +86,7 @@ export async function action({ request }: ActionFunctionArgs) {
     ...parsed.data,
     startsAt,
     endsAt,
-    status: shouldAutoActivate ? ExperimentStatus.ACTIVE : ExperimentStatus.DRAFT,
+    status: shouldAutoActivate ? "ACTIVE" : "DRAFT",
     assignmentMode: parsed.data.assignmentMode,
     assignmentTtlDays:
       parsed.data.assignmentTtlDays === "" || parsed.data.assignmentTtlDays == null
@@ -92,13 +104,13 @@ const TARGET_OPTIONS = [
   { label: "Exact path", value: "EXACT_PATH" },
 ];
 const ASSIGNMENT_MODE_OPTIONS = [
-  { label: "Sticky (recommended)", value: AssignmentMode.STICKY },
-  { label: "Per session", value: AssignmentMode.SESSION },
+  { label: "Sticky (recommended)", value: ASSIGNMENT_MODE.STICKY },
+  { label: "Per session", value: ASSIGNMENT_MODE.SESSION },
 ];
 const AUDIENCE_RULE_OPTIONS = [
-  { label: "All visitors", value: AudienceRule.ALL_VISITORS },
-  { label: "New visitors only", value: AudienceRule.NEW_VISITORS },
-  { label: "Returning visitors only", value: AudienceRule.RETURNING_VISITORS },
+  { label: "All visitors", value: AUDIENCE_RULE.ALL_VISITORS },
+  { label: "New visitors only", value: AUDIENCE_RULE.NEW_VISITORS },
+  { label: "Returning visitors only", value: AUDIENCE_RULE.RETURNING_VISITORS },
 ];
 
 type ErrorData = { ok: false; errors: { fieldErrors: Record<string, string[]> } };
@@ -121,9 +133,9 @@ export default function NewExperimentPage() {
     selectorB: "",
     startsAt: "",
     endsAt: "",
-    assignmentMode: AssignmentMode.STICKY,
+    assignmentMode: ASSIGNMENT_MODE.STICKY,
     assignmentTtlDays: "",
-    audienceRule: AudienceRule.ALL_VISITORS,
+    audienceRule: AUDIENCE_RULE.ALL_VISITORS,
   });
   const setField =
     (field: keyof typeof formValues) =>
@@ -232,7 +244,7 @@ export default function NewExperimentPage() {
               value={formValues.assignmentMode}
               onChange={setField("assignmentMode")}
             />
-            {formValues.assignmentMode === AssignmentMode.STICKY ? (
+            {formValues.assignmentMode === ASSIGNMENT_MODE.STICKY ? (
               <TextField
                 label="Re-randomize after N days (optional)"
                 name="assignmentTtlDays"
