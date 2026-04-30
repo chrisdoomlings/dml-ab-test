@@ -11,6 +11,7 @@
   var sessionId = getOrCreateSessionId();
   var isReturningVisitor = readReturningFlag();
   var ASSIGNMENT_COOKIE = "dml_ab_assignments";
+  var liveExperimentsState = [];
 
   function getOrCreateVisitorId() {
     try {
@@ -223,6 +224,24 @@
     return shownVariant;
   }
 
+  function runVerificationTicks() {
+    if (!liveExperimentsState.length) return;
+    var assignments = getAssignments();
+    var changed = false;
+    liveExperimentsState.forEach(function (exp) {
+      if (!exp.verificationMode) return;
+      var shown = applyExperiment(exp);
+      if (shown && assignments[exp.id] !== shown) {
+        assignments[exp.id] = shown;
+        changed = true;
+      }
+    });
+    if (changed) {
+      saveAssignments(assignments);
+      setCartAttributes(assignments);
+    }
+  }
+
   // Apply last known assignments immediately to reduce refresh flicker.
   var cached = getCachedExperiments();
   if (cached.pagePath === location.pathname) {
@@ -256,6 +275,7 @@
     .then(function (data) {
       var assignments = getAssignments();
       var liveExperiments = data.experiments || [];
+      liveExperimentsState = liveExperiments;
       liveExperiments.forEach(function (exp) {
         assignments[exp.id] = applyExperiment(exp) || exp.variant;
       });
@@ -267,6 +287,8 @@
     .catch(function () {
       // fail-open: theme default section remains visible
     });
+
+  setInterval(runVerificationTicks, 1000);
 
   document.addEventListener("submit", function (event) {
     var form = event.target;

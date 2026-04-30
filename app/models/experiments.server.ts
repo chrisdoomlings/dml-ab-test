@@ -124,15 +124,14 @@ export async function assignVariant(input: {
   });
 
   if (existing) {
-    const createdAtMs = new Date(existing.createdAt).getTime();
+    const assignedAtMs = new Date(existing.updatedAt).getTime();
     const ttlDays = input.assignmentTtlDays ?? null;
     const ttlExpired = ttlDays && ttlDays > 0
-      ? Date.now() - createdAtMs > ttlDays * 24 * 60 * 60 * 1000
+      ? Date.now() - assignedAtMs > ttlDays * 24 * 60 * 60 * 1000
       : false;
     const sessionMismatch =
       input.assignmentMode === AssignmentMode.SESSION &&
       Boolean(input.sessionId) &&
-      existing.sessionId &&
       existing.sessionId !== input.sessionId;
 
     if (!ttlExpired && !sessionMismatch) {
