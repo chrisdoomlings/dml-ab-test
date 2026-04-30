@@ -1,6 +1,6 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
 import { Link, useLoaderData } from "@remix-run/react";
-import { Card, Page, Text } from "@shopify/polaris";
+import { Badge, Card, Page, Text } from "@shopify/polaris";
 import { listExperiments } from "../models/experiments.server";
 import { requireShopRecord } from "../lib/shop.server";
 
@@ -28,10 +28,12 @@ export default function AppIndex() {
             experiments.map((experiment) => (
               <div key={experiment.id} style={{ marginBottom: 12 }}>
                 <Link to={`/app/experiments/${experiment.id}`}>{experiment.name}</Link>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  {experiment.status} • Split A {experiment.trafficSplitA}% / B{" "}
-                  {100 - experiment.trafficSplitA}%
-                </Text>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
+                  <Badge>{experiment.status}</Badge>
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    Split A {experiment.trafficSplitA}% / B {100 - experiment.trafficSplitA}%
+                  </Text>
+                </div>
               </div>
             ))
           )}

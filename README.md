@@ -16,8 +16,8 @@ This project is a private Shopify app starter for running A/B tests on custom th
 3. API assigns visitor to A/B once and persists that assignment.
 4. Script shows selected section and hides the other.
 5. Script tracks impression/click/add-to-cart.
-6. Orders webhook attributes revenue to variant.
-7. Analytics page summarizes performance and winner.
+6. Analytics page summarizes visitor, impression, click, and add-to-cart performance.
+7. After protected customer data approval, enable the orders webhook to attribute revenue to variants.
 
 ## File Structure
 
@@ -62,13 +62,14 @@ This project is a private Shopify app starter for running A/B tests on custom th
 - Use one assignment per `experiment + visitorId`.
 - Track only active variant clicks by binding click listener to selected node.
 - Persist assignment in localStorage for consistency.
-- Pass `ab_visitor_id`, `ab_experiment_id`, `ab_variant` as cart/order note attributes for strong purchase attribution.
-- Keep webhook idempotent using unique `orderId`.
+- The storefront script writes `ab_visitor_id`, `dml_ab_assignments`, `ab_experiment_id`, and `ab_variant` as cart attributes for later order attribution.
+- The `orders/create` webhook route is implemented, but the webhook subscription is intentionally not enabled in `shopify.app.toml` until the app is approved for protected customer data.
+- After approval, add the `read_orders` scope and an `orders/create` webhook subscription pointing to `/webhooks/orders_create`.
+- Keep webhook attribution idempotent using `experimentId + orderId`.
 
 ## Production Hardening (Recommended)
 
-- Validate Shopify webhook HMAC before processing.
-- Replace placeholder shop lookup/auth with `authenticate.admin` from `@shopify/shopify-app-remix`.
+- Request protected customer data access before enabling order webhooks or revenue attribution.
 - Use batching/debounce for high-volume click events.
 - Add bot filtering and internal-traffic exclusion.
 - Add significance calculation (z-test/Bayesian) before declaring winner.

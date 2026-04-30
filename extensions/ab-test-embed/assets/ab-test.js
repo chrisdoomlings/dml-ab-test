@@ -43,6 +43,25 @@
     }).catch(function () {});
   }
 
+  function setCartAttributes(assignments) {
+    var keys = Object.keys(assignments);
+    if (!keys.length) return;
+
+    fetch("/cart/update.js", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      keepalive: true,
+      body: JSON.stringify({
+        attributes: {
+          ab_visitor_id: visitorId,
+          dml_ab_assignments: JSON.stringify(assignments),
+          ab_experiment_id: keys[0],
+          ab_variant: assignments[keys[0]],
+        },
+      }),
+    }).catch(function () {});
+  }
+
   function applyExperiment(exp) {
     var selectorA = exp.variants.A;
     var selectorB = exp.variants.B;
@@ -95,6 +114,7 @@
         applyExperiment(exp);
       });
       saveAssignments(assignments);
+      setCartAttributes(assignments);
     })
     .catch(function () {
       // fail-open: theme default section remains visible
@@ -106,6 +126,7 @@
     var action = form.getAttribute("action") || "";
     if (action.indexOf("/cart/add") === -1) return;
     var assignments = getAssignments();
+    setCartAttributes(assignments);
     Object.keys(assignments).forEach(function (experimentId) {
       track({
         experimentId: experimentId,

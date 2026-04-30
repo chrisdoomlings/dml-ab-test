@@ -107,7 +107,7 @@ model Event {
 model OrderAttribution {
   id           String      @id @default(cuid())
   experimentId String
-  orderId      String      @unique
+  orderId      String
   visitorId    String
   variantKey   VariantKey
   revenue      Float
@@ -115,6 +115,7 @@ model OrderAttribution {
   createdAt    DateTime    @default(now())
   experiment   Experiment  @relation(fields: [experimentId], references: [id], onDelete: Cascade)
 
+  @@unique([experimentId, orderId])
   @@index([experimentId, variantKey])
 }
 

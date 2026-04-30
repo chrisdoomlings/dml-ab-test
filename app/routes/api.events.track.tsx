@@ -1,6 +1,7 @@
 import { json, type ActionFunctionArgs } from "@remix-run/node";
 import { z } from "zod";
 import { trackEvent } from "../models/experiments.server";
+import { corsHeaders, optionsResponse } from "../lib/cors.server";
 
 const TrackEventSchema = z.object({
   experimentId: z.string().min(1),
@@ -17,14 +18,19 @@ const TrackEventSchema = z.object({
 });
 
 export async function action({ request }: ActionFunctionArgs) {
+  if (request.method === "OPTIONS") return optionsResponse();
+
   if (request.method !== "POST") {
-    return json({ error: "Method not allowed" }, { status: 405 });
+    return json({ error: "Method not allowed" }, { status: 405, headers: corsHeaders });
   }
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = TrackEventSchema.safeParse(body);
   if (!parsed.success) {
-    return json({ error: "Invalid payload", details: parsed.error.flatten() }, { status: 400 });
+    return json(
+      { error: "Invalid payload", details: parsed.error.flatten() },
+      { status: 400, headers: corsHeaders },
+    );
   }
 
   await trackEvent({
@@ -32,5 +38,5 @@ export async function action({ request }: ActionFunctionArgs) {
     metadata: parsed.data.metadata ?? {},
   });
 
-  return json({ ok: true });
+  return json({ ok: true }, { headers: corsHeaders });
 }

@@ -8,7 +8,7 @@ automatically_update_urls_on_dev = true
 dev_store_url = ""
 
 [access_scopes]
-scopes = "read_orders,read_themes,write_script_tags"
+scopes = "read_themes,write_script_tags"
 
 [auth]
 redirect_urls = [

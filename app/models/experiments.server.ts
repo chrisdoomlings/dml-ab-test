@@ -36,11 +36,37 @@ export function createExperiment(input: {
   });
 }
 
+export function updateExperimentStatus(input: {
+  id: string;
+  shopId: string;
+  status: ExperimentStatus;
+}) {
+  return prisma.experiment.updateMany({
+    where: { id: input.id, shopId: input.shopId },
+    data: {
+      status: input.status,
+      startsAt: input.status === ExperimentStatus.ACTIVE ? new Date() : undefined,
+      endsAt: input.status === ExperimentStatus.STOPPED ? new Date() : undefined,
+    },
+  });
+}
+
+export function deleteExperiment(input: { id: string; shopId: string }) {
+  return prisma.experiment.deleteMany({
+    where: { id: input.id, shopId: input.shopId },
+  });
+}
+
 export async function getActiveExperimentsForPath(shopId: string, path: string, template?: string) {
+  const now = new Date();
   const active = await prisma.experiment.findMany({
     where: {
       shopId,
       status: ExperimentStatus.ACTIVE,
+      AND: [
+        { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
+        { OR: [{ endsAt: null }, { endsAt: { gt: now } }] },
+      ],
       OR: [
         { targetType: "ALL_PAGES" },
         { targetType: "EXACT_PATH", targetValue: path },
@@ -67,9 +93,17 @@ export async function assignVariant(experimentId: string, visitorId: string, spl
   const roll = Math.random() * 100;
   const variantKey: VariantKey = roll < splitA ? "A" : "B";
 
-  await prisma.visitorAssignment.create({
-    data: { experimentId, visitorId, variantKey },
-  });
+  try {
+    await prisma.visitorAssignment.create({
+      data: { experimentId, visitorId, variantKey },
+    });
+  } catch {
+    const concurrent = await prisma.visitorAssignment.findUnique({
+      where: { experimentId_visitorId: { experimentId, visitorId } },
+    });
+    if (concurrent) return concurrent.variantKey;
+    throw new Error("Unable to assign experiment variant");
+  }
 
   return variantKey;
 }
