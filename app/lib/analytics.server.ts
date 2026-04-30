@@ -31,7 +31,7 @@ function lift(control: number, variant: number) {
 function certainty(visitorsA: number, visitorsB: number, liftValue: number) {
   const sampleScore = Math.min(1, (visitorsA + visitorsB) / 1000);
   const effectScore = Math.min(1, Math.abs(liftValue) * 8);
-  return Math.round((0.52 + sampleScore * 0.26 + effectScore * 0.2) * 100);
+  return Math.round((0.5 + sampleScore * 0.28 + effectScore * 0.2) * 100);
 }
 
 export function statusLabel(status: ExperimentStatus) {
@@ -50,6 +50,8 @@ export function summarizeExperiment(experiment: ExperimentWithVariants, summary:
   const clicksB = countByVariant(summary, "B", "CLICK");
   const addsA = countByVariant(summary, "A", "ADD_TO_CART");
   const addsB = countByVariant(summary, "B", "ADD_TO_CART");
+  const checkoutsA = countByVariant(summary, "A", "CHECKOUT_STARTED");
+  const checkoutsB = countByVariant(summary, "B", "CHECKOUT_STARTED");
   const purchasesA = countByVariant(summary, "A", "PURCHASE");
   const purchasesB = countByVariant(summary, "B", "PURCHASE");
   const revenueA = revenueByVariant(summary, "A");
@@ -91,6 +93,8 @@ export function summarizeExperiment(experiment: ExperimentWithVariants, summary:
     clicksB,
     addsA,
     addsB,
+    checkoutsA,
+    checkoutsB,
     purchasesA,
     purchasesB,
     revenueA,
@@ -152,6 +156,7 @@ function countEvent(row: ReturnType<typeof summarizeExperiment>, eventType: Even
   if (eventType === "IMPRESSION") return row.impressionsA + row.impressionsB;
   if (eventType === "CLICK") return row.clicksA + row.clicksB;
   if (eventType === "ADD_TO_CART") return row.addsA + row.addsB;
+  if (eventType === "CHECKOUT_STARTED") return row.checkoutsA + row.checkoutsB;
   if (eventType === "PURCHASE") return row.purchasesA + row.purchasesB;
   return 0;
 }

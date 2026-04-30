@@ -120,7 +120,7 @@ export default function ExperimentDetailsPage() {
   const { experiment } = useLoaderData<typeof loader>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
-  const probabilityB = experiment.certaintyScore;
+  const probabilityB = experiment.winner === "B" ? experiment.certaintyScore : 100 - experiment.certaintyScore;
   const probabilityA = 100 - probabilityB;
 
   return (

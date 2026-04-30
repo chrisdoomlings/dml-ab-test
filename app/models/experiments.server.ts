@@ -36,16 +36,21 @@ export function createExperiment(input: {
   });
 }
 
-export function updateExperimentStatus(input: {
+export async function updateExperimentStatus(input: {
   id: string;
   shopId: string;
   status: ExperimentStatus;
 }) {
+  const existing = await prisma.experiment.findFirst({
+    where: { id: input.id, shopId: input.shopId },
+    select: { startsAt: true },
+  });
+
   return prisma.experiment.updateMany({
     where: { id: input.id, shopId: input.shopId },
     data: {
       status: input.status,
-      startsAt: input.status === ExperimentStatus.ACTIVE ? new Date() : undefined,
+      startsAt: input.status === ExperimentStatus.ACTIVE && !existing?.startsAt ? new Date() : undefined,
       endsAt: input.status === ExperimentStatus.STOPPED ? new Date() : undefined,
     },
   });
