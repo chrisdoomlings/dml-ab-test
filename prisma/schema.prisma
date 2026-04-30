@@ -47,6 +47,8 @@ model Experiment {
   assignmentMode    AssignmentMode      @default(STICKY)
   assignmentTtlDays Int?
   audienceRule      AudienceRule        @default(ALL_VISITORS)
+  verificationMode  Boolean             @default(false)
+  verificationSwapSeconds Int? 
   status            ExperimentStatus    @default(DRAFT)
   startsAt          DateTime?
   endsAt            DateTime?

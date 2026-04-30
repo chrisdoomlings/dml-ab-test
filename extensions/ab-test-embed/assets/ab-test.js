@@ -162,18 +162,36 @@
   }
 
   function bindClickTracking(activeNode, exp) {
-    var marker = "dml_ab_click_" + exp.id;
+    var marker = "dml_ab_click_" + exp.id + "_" + exp._shownVariant;
     if (activeNode.getAttribute(marker) === "1") return;
     activeNode.setAttribute(marker, "1");
     activeNode.addEventListener("click", function () {
       track({
         experimentId: exp.id,
         visitorId: visitorId,
-        variantKey: exp.variant,
+        variantKey: exp._shownVariant,
         eventType: "CLICK",
         pagePath: location.pathname,
       });
     });
+  }
+
+  function hashString(value) {
+    var hash = 0;
+    for (var i = 0; i < value.length; i += 1) {
+      hash = (hash << 5) - hash + value.charCodeAt(i);
+      hash |= 0;
+    }
+    return Math.abs(hash);
+  }
+
+  function resolveShownVariant(exp) {
+    if (!exp.verificationMode) return exp.variant;
+    var swapSeconds = Number(exp.verificationSwapSeconds || 5);
+    var seconds = swapSeconds > 0 ? swapSeconds : 5;
+    var timeSlot = Math.floor(Date.now() / (seconds * 1000));
+    var offset = hashString(String(exp.id)) % 2;
+    return (timeSlot + offset) % 2 === 0 ? "A" : "B";
   }
 
   function applyExperiment(exp, options) {
@@ -184,7 +202,9 @@
     var nodeB = document.querySelector(selectorB);
     if (!nodeA || !nodeB) return;
 
-    var showA = exp.variant === "A";
+    var shownVariant = resolveShownVariant(exp);
+    exp._shownVariant = shownVariant;
+    var showA = shownVariant === "A";
     nodeA.style.display = showA ? "" : "none";
     nodeB.style.display = showA ? "none" : "";
 
@@ -192,7 +212,7 @@
       track({
         experimentId: exp.id,
         visitorId: visitorId,
-        variantKey: exp.variant,
+        variantKey: shownVariant,
         eventType: "IMPRESSION",
         pagePath: location.pathname,
       });
@@ -200,6 +220,7 @@
 
     var activeNode = showA ? nodeA : nodeB;
     bindClickTracking(activeNode, exp);
+    return shownVariant;
   }
 
   // Apply last known assignments immediately to reduce refresh flicker.
@@ -236,8 +257,7 @@
       var assignments = getAssignments();
       var liveExperiments = data.experiments || [];
       liveExperiments.forEach(function (exp) {
-        assignments[exp.id] = exp.variant;
-        applyExperiment(exp);
+        assignments[exp.id] = applyExperiment(exp) || exp.variant;
       });
       saveCachedExperiments(liveExperiments);
       saveAssignments(assignments);

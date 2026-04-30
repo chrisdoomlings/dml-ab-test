@@ -88,6 +88,8 @@ export function summarizeExperiment(experiment: ExperimentWithVariants, summary:
     assignmentMode: experiment.assignmentMode,
     assignmentTtlDays: experiment.assignmentTtlDays,
     audienceRule: experiment.audienceRule,
+    verificationMode: experiment.verificationMode,
+    verificationSwapSeconds: experiment.verificationSwapSeconds,
     createdAt: experiment.createdAt,
     startedAt: experiment.startsAt,
     endedAt: experiment.endsAt,

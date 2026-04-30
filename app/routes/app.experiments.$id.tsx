@@ -201,6 +201,7 @@ export default function ExperimentDetailsPage() {
             <InlineGrid columns={{ xs: 1, md: 2 }} gap="200">
               <Text as="p" tone="subdued">Assignment<br /><Text as="span" fontWeight="semibold">{assignmentModeLabel(experiment.assignmentMode, experiment.assignmentTtlDays)}</Text></Text>
               <Text as="p" tone="subdued">Audience<br /><Text as="span" fontWeight="semibold">{audienceRuleLabel(experiment.audienceRule)}</Text></Text>
+              <Text as="p" tone="subdued">Verification mode<br /><Text as="span" fontWeight="semibold">{experiment.verificationMode ? `On, swaps every ${experiment.verificationSwapSeconds || 5}s` : "Off"}</Text></Text>
               <Text as="p" tone="subdued">Starts at<br /><Text as="span" fontWeight="semibold">{dateTimeLabel(experiment.startedAt)}</Text></Text>
               <Text as="p" tone="subdued">Ends at<br /><Text as="span" fontWeight="semibold">{dateTimeLabel(experiment.endedAt)}</Text></Text>
             </InlineGrid>

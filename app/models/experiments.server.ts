@@ -23,6 +23,8 @@ export function createExperiment(input: {
   assignmentMode?: AssignmentMode;
   assignmentTtlDays?: number | null;
   audienceRule?: AudienceRule;
+  verificationMode?: boolean;
+  verificationSwapSeconds?: number | null;
 }) {
   return prisma.experiment.create({
     data: {
@@ -37,6 +39,8 @@ export function createExperiment(input: {
       assignmentMode: input.assignmentMode ?? AssignmentMode.STICKY,
       assignmentTtlDays: input.assignmentTtlDays ?? null,
       audienceRule: input.audienceRule ?? AudienceRule.ALL_VISITORS,
+      verificationMode: input.verificationMode ?? false,
+      verificationSwapSeconds: input.verificationSwapSeconds ?? null,
       variants: {
         create: [
           { key: "A", selector: input.selectorA },

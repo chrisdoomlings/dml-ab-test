@@ -1,7 +1,7 @@
 import { json, redirect, type ActionFunctionArgs } from "@remix-run/node";
 import { Form, useActionData, useNavigation } from "@remix-run/react";
 import { useState } from "react";
-import { BlockStack, Button, ButtonGroup, Card, FormLayout, Page, Select, TextField } from "@shopify/polaris";
+import { BlockStack, Button, ButtonGroup, Card, Checkbox, FormLayout, Page, Select, TextField } from "@shopify/polaris";
 import { z } from "zod";
 import { createExperiment } from "../models/experiments.server";
 import { requireShopRecord } from "../lib/shop.server";
@@ -31,6 +31,8 @@ const Schema = z.object({
   audienceRule: z
     .enum([AUDIENCE_RULE.ALL_VISITORS, AUDIENCE_RULE.NEW_VISITORS, AUDIENCE_RULE.RETURNING_VISITORS])
     .default(AUDIENCE_RULE.ALL_VISITORS),
+  verificationMode: z.union([z.literal("on"), z.literal("true"), z.literal("false"), z.literal(""), z.undefined()]).optional(),
+  verificationSwapSeconds: z.union([z.literal(""), z.coerce.number().int().min(1).max(120)]).optional(),
 }).superRefine((data, ctx) => {
   if (data.endsAt && !data.startsAt) {
     ctx.addIssue({
@@ -57,6 +59,15 @@ const Schema = z.object({
       code: z.ZodIssueCode.custom,
       path: ["assignmentTtlDays"],
       message: "TTL is only used for sticky assignment mode.",
+    });
+  }
+
+  const verificationMode = data.verificationMode === "on" || data.verificationMode === "true";
+  if (verificationMode && (!data.verificationSwapSeconds || data.verificationSwapSeconds === "")) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["verificationSwapSeconds"],
+      message: "Set swap interval in seconds for verification mode.",
     });
   }
 });
@@ -93,6 +104,11 @@ export async function action({ request }: ActionFunctionArgs) {
         ? null
         : parsed.data.assignmentTtlDays,
     audienceRule: parsed.data.audienceRule,
+    verificationMode: parsed.data.verificationMode === "on" || parsed.data.verificationMode === "true",
+    verificationSwapSeconds:
+      parsed.data.verificationSwapSeconds === "" || parsed.data.verificationSwapSeconds == null
+        ? null
+        : parsed.data.verificationSwapSeconds,
   });
   return redirect(`/app/experiments/${experiment.id}`);
 }
@@ -136,6 +152,8 @@ export default function NewExperimentPage() {
     assignmentMode: ASSIGNMENT_MODE.STICKY,
     assignmentTtlDays: "",
     audienceRule: AUDIENCE_RULE.ALL_VISITORS,
+    verificationMode: false,
+    verificationSwapSeconds: "5",
   });
   const setField =
     (field: keyof typeof formValues) =>
@@ -265,6 +283,28 @@ export default function NewExperimentPage() {
               value={formValues.audienceRule}
               onChange={setField("audienceRule")}
             />
+            <Checkbox
+              label="Verification mode (auto swap A/B for QA)"
+              name="verificationMode"
+              checked={formValues.verificationMode}
+              onChange={(checked) =>
+                setFormValues((prev) => ({ ...prev, verificationMode: checked }))
+              }
+              helpText="Use only for testing instrumentation and UI behavior."
+            />
+            {formValues.verificationMode ? (
+              <TextField
+                label="Swap every N seconds"
+                name="verificationSwapSeconds"
+                value={formValues.verificationSwapSeconds}
+                onChange={setField("verificationSwapSeconds")}
+                type="number"
+                autoComplete="off"
+                min={1}
+                max={120}
+                error={fieldError(errors, "verificationSwapSeconds")}
+              />
+            ) : null}
             <ButtonGroup>
               <Button submit variant="primary" loading={isSubmitting}>
                 Save experiment

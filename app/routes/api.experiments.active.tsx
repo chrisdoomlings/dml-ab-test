@@ -48,6 +48,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
         name: experiment.name,
         variant,
         variants: variantSelectors,
+        verificationMode: experiment.verificationMode,
+        verificationSwapSeconds: experiment.verificationSwapSeconds,
       };
     }),
   );
