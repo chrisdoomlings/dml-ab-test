@@ -1,8 +1,13 @@
 import type { EventType, Experiment, ExperimentStatus, Variant, VariantKey } from "@prisma/client";
-import { getExperimentSummary, listExperiments } from "../models/experiments.server";
+import { prisma } from "./db.server";
+import { listExperiments } from "../models/experiments.server";
 
 type ExperimentWithVariants = Experiment & { variants: Variant[] };
-type Summary = Awaited<ReturnType<typeof getExperimentSummary>>;
+type Summary = {
+  assignments: Array<{ variantKey: VariantKey; _count: { _all: number } }>;
+  events: Array<{ variantKey: VariantKey; eventType: EventType; _count: { _all: number } }>;
+  attributions: Array<{ variantKey: VariantKey; _sum: { revenue: number | null } }>;
+};
 
 const EVENT_TYPES: EventType[] = ["IMPRESSION", "CLICK", "ADD_TO_CART", "CHECKOUT_STARTED", "PURCHASE"];
 
@@ -118,10 +123,53 @@ export function summarizeExperiment(experiment: ExperimentWithVariants, summary:
 
 export async function listExperimentAnalytics(shopId: string) {
   const experiments = await listExperiments(shopId);
-  return Promise.all(
-    experiments.map(async (experiment) => {
-      const summary = await getExperimentSummary(experiment.id);
-      return summarizeExperiment(experiment, summary);
+  if (experiments.length === 0) return [];
+
+  const experimentIds = experiments.map((experiment) => experiment.id);
+  const [assignments, events, attributions] = await Promise.all([
+    prisma.visitorAssignment.groupBy({
+      by: ["experimentId", "variantKey"],
+      where: { experimentId: { in: experimentIds } },
+      _count: { _all: true },
+    }),
+    prisma.event.groupBy({
+      by: ["experimentId", "variantKey", "eventType"],
+      where: { experimentId: { in: experimentIds } },
+      _count: { _all: true },
+    }),
+    prisma.orderAttribution.groupBy({
+      by: ["experimentId", "variantKey"],
+      where: { experimentId: { in: experimentIds } },
+      _sum: { revenue: true },
+    }),
+  ]);
+
+  const assignmentMap = new Map<string, Summary["assignments"]>();
+  assignments.forEach((row) => {
+    const rows = assignmentMap.get(row.experimentId) ?? [];
+    rows.push({ variantKey: row.variantKey, _count: row._count });
+    assignmentMap.set(row.experimentId, rows);
+  });
+
+  const eventMap = new Map<string, Summary["events"]>();
+  events.forEach((row) => {
+    const rows = eventMap.get(row.experimentId) ?? [];
+    rows.push({ variantKey: row.variantKey, eventType: row.eventType, _count: row._count });
+    eventMap.set(row.experimentId, rows);
+  });
+
+  const attributionMap = new Map<string, Summary["attributions"]>();
+  attributions.forEach((row) => {
+    const rows = attributionMap.get(row.experimentId) ?? [];
+    rows.push({ variantKey: row.variantKey, _sum: { revenue: row._sum.revenue ?? 0 } });
+    attributionMap.set(row.experimentId, rows);
+  });
+
+  return experiments.map((experiment) =>
+    summarizeExperiment(experiment, {
+      assignments: assignmentMap.get(experiment.id) ?? [],
+      events: eventMap.get(experiment.id) ?? [],
+      attributions: attributionMap.get(experiment.id) ?? [],
     }),
   );
 }

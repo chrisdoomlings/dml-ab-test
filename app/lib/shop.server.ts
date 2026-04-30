@@ -9,14 +9,27 @@ export async function requireShopRecord(request: Request) {
     throw new Response("Unauthorized", { status: 401 });
   }
 
-  return prisma.shop.upsert({
+  const accessToken = session.accessToken || "";
+  const existing = await prisma.shop.findUnique({
     where: { shopDomain },
-    create: {
-      shopDomain,
-      accessToken: session.accessToken || "",
-    },
-    update: {
-      accessToken: session.accessToken || "",
-    },
   });
+
+  if (!existing) {
+    return prisma.shop.create({
+      data: {
+        shopDomain,
+        accessToken,
+      },
+    });
+  }
+
+  // Avoid a write on every request; only update token when it actually changed.
+  if (existing.accessToken !== accessToken) {
+    return prisma.shop.update({
+      where: { id: existing.id },
+      data: { accessToken },
+    });
+  }
+
+  return existing;
 }

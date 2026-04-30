@@ -29,7 +29,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (!id) throw new Response("Not found", { status: 404 });
 
   const formData = await request.formData();
-  const intent = String(formData.get("intent") ?? "");
+  const intent = String(formData.get("intent") ?? formData.get("_action") ?? "");
 
   if (intent === "delete") {
     await deleteExperiment({ id, shopId: shop.id });
@@ -138,10 +138,26 @@ export default function ExperimentDetailsPage() {
             </InlineStack>
             <Form method="post">
               <ButtonGroup>
-                <Button submit name="intent" value="ACTIVE" disabled={isSubmitting || experiment.status === "ACTIVE"}>Activate</Button>
-                <Button submit name="intent" value="PAUSED" disabled={isSubmitting || experiment.status === "PAUSED"}>Pause</Button>
-                <Button submit name="intent" value="STOPPED" disabled={isSubmitting || experiment.status === "STOPPED"}>Stop</Button>
-                <Button submit name="intent" value="delete" tone="critical" disabled={isSubmitting}>Delete</Button>
+                <input type="hidden" name="intent" value="ACTIVE" />
+                <Button submit disabled={isSubmitting || experiment.status === "ACTIVE"}>Activate</Button>
+              </ButtonGroup>
+            </Form>
+            <Form method="post">
+              <ButtonGroup>
+                <input type="hidden" name="intent" value="PAUSED" />
+                <Button submit disabled={isSubmitting || experiment.status === "PAUSED"}>Pause</Button>
+              </ButtonGroup>
+            </Form>
+            <Form method="post">
+              <ButtonGroup>
+                <input type="hidden" name="intent" value="STOPPED" />
+                <Button submit disabled={isSubmitting || experiment.status === "STOPPED"}>Stop</Button>
+              </ButtonGroup>
+            </Form>
+            <Form method="post">
+              <ButtonGroup>
+                <input type="hidden" name="intent" value="delete" />
+                <Button submit tone="critical" disabled={isSubmitting}>Delete</Button>
               </ButtonGroup>
             </Form>
           </InlineStack>
