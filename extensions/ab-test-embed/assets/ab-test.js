@@ -135,6 +135,7 @@
   }
 
   function track(payload) {
+    payload.shopDomain = cfg.shopDomain;
     return fetch(cfg.appBaseUrl + "/api/events/track", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

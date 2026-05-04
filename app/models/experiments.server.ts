@@ -120,7 +120,7 @@ export async function assignVariant(input: {
   sessionId?: string;
 }): Promise<VariantKey> {
   const existing = await prisma.visitorAssignment.findUnique({
-    where: { experimentId_visitorId: { experimentId, visitorId } },
+    where: { experimentId_visitorId: { experimentId: input.experimentId, visitorId: input.visitorId } },
   });
 
   if (existing) {

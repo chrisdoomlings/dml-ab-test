@@ -27,5 +27,11 @@
     "react-dom": "latest",
     "remix-serve": "latest",
     "zod": "latest"
+  },
+  "overrides": {
+    "esbuild": "^0.25.0",
+    "estree-util-value-to-estree": "^3.3.3",
+    "tar": "^7.5.11",
+    "vite": "^6.4.2"
   }
 }
