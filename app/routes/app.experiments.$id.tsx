@@ -20,7 +20,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (!experiment) throw new Response("Not found", { status: 404 });
 
   const summary = await getExperimentSummary(id);
-  return json({ experiment: summarizeExperiment(experiment, summary) });
+  return json({ experiment: summarizeExperiment(experiment, summary), shopDomain: shop.shopDomain });
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -146,8 +146,14 @@ function formatPValue(p: number) {
   return `p = ${p.toFixed(3)}`;
 }
 
+function previewUrl(shopDomain: string, experimentId: string, targetType: string, targetValue: string | null, variant: "A" | "B") {
+  const path =
+    targetType === "EXACT_PATH" || targetType === "PATH_PREFIX" ? targetValue || "/" : "/";
+  return `https://${shopDomain}${path}?dml_ab_preview=${experimentId}:${variant}`;
+}
+
 export default function ExperimentDetailsPage() {
-  const { experiment } = useLoaderData<typeof loader>();
+  const { experiment, shopDomain } = useLoaderData<typeof loader>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
   const probabilityB = experiment.winner === "B" ? experiment.certaintyScore : 100 - experiment.certaintyScore;
@@ -241,6 +247,43 @@ export default function ExperimentDetailsPage() {
           <VariantCard title="Original" probability={probabilityA} selector={selectorFor(experiment, "A")} variant="A" visitors={experiment.visitorsA} ctr={experiment.ctrA} atc={experiment.atcA} rpv={experiment.rpvA} />
           <VariantCard title="Variant" probability={probabilityB} selector={selectorFor(experiment, "B")} variant="B" visitors={experiment.visitorsB} ctr={experiment.ctrB} atc={experiment.atcB} rpv={experiment.rpvB} />
         </InlineGrid>
+
+        <Card>
+          <BlockStack gap="300">
+            <BlockStack gap="100">
+              <Text as="h2" variant="headingMd">Test mode</Text>
+              <Text as="p" tone="subdued">
+                Open your storefront with a forced variant to visually verify the experiment.
+                A floating toolbar lets you toggle between variants without affecting analytics data.
+              </Text>
+            </BlockStack>
+            <InlineStack gap="200" blockAlign="center" wrap>
+              <Button
+                url={previewUrl(shopDomain, experiment.id, experiment.targetType, experiment.targetValue ?? null, "A")}
+                external
+              >
+                Preview Original (A)
+              </Button>
+              <Button
+                url={previewUrl(shopDomain, experiment.id, experiment.targetType, experiment.targetValue ?? null, "B")}
+                external
+                variant="primary"
+              >
+                Preview Variant (B)
+              </Button>
+            </InlineStack>
+            <Text as="p" tone="subdued" variant="bodySm">
+              Selectors — Original: <Text as="span" fontWeight="semibold">{selectorFor(experiment, "A")}</Text>
+              {" · "}
+              Variant: <Text as="span" fontWeight="semibold">{selectorFor(experiment, "B")}</Text>
+            </Text>
+            {experiment.status !== "ACTIVE" && (
+              <Text as="p" tone="caution" variant="bodySm">
+                This experiment is not active. Preview links will open the page but no variant will be forced — activate the experiment first.
+              </Text>
+            )}
+          </BlockStack>
+        </Card>
       </BlockStack>
     </Page>
   );

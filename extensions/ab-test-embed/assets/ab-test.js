@@ -7,11 +7,11 @@
   var RETURNING_KEY = "dml_ab_seen";
   var ASSIGNMENTS_KEY = "dml_ab_assignments";
   var EXPERIMENTS_KEY = "dml_ab_experiments";
-  var visitorId = getOrCreateVisitorId();
-  var sessionId = getOrCreateSessionId();
-  var isReturningVisitor = readReturningFlag();
   var ASSIGNMENT_COOKIE = "dml_ab_assignments";
+  var PREVIEW_PARAM = "dml_ab_preview";
   var liveExperimentsState = [];
+
+  // ─── Visitor / session identity ──────────────────────────────────────────
 
   function getOrCreateVisitorId() {
     try {
@@ -48,10 +48,10 @@
   function markVisitorSeen() {
     try {
       localStorage.setItem(RETURNING_KEY, "1");
-    } catch (e) {
-      // noop
-    }
+    } catch (e) {}
   }
+
+  // ─── Cookie helpers ───────────────────────────────────────────────────────
 
   function readCookie(name) {
     var prefix = name + "=";
@@ -66,16 +66,11 @@
   function writeCookie(name, value, maxAgeSeconds) {
     try {
       document.cookie =
-        name +
-        "=" +
-        value +
-        "; path=/; max-age=" +
-        String(maxAgeSeconds) +
-        "; SameSite=Lax";
-    } catch (e) {
-      // noop
-    }
+        name + "=" + value + "; path=/; max-age=" + String(maxAgeSeconds) + "; SameSite=Lax";
+    } catch (e) {}
   }
+
+  // ─── Assignment storage ───────────────────────────────────────────────────
 
   function parseAssignments(text) {
     try {
@@ -95,11 +90,11 @@
   function saveAssignments(map) {
     try {
       localStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify(map));
-    } catch (e) {
-      // noop
-    }
+    } catch (e) {}
     writeCookie(ASSIGNMENT_COOKIE, encodeURIComponent(JSON.stringify(map)), 60 * 60 * 24 * 30);
   }
+
+  // ─── Experiment cache ─────────────────────────────────────────────────────
 
   function getCachedExperiments() {
     try {
@@ -129,10 +124,121 @@
           experiments: experiments || [],
         }),
       );
+    } catch (e) {}
+  }
+
+  // ─── Preview mode ─────────────────────────────────────────────────────────
+
+  // Parses ?dml_ab_preview=expId:A,expId2:B from the URL.
+  // Returns a map of { experimentId -> "A"|"B" } or null if not in preview mode.
+  function getPreviewOverrides() {
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var raw = params.get(PREVIEW_PARAM);
+      if (!raw) return null;
+      var overrides = {};
+      raw.split(",").forEach(function (part) {
+        var sep = part.lastIndexOf(":");
+        if (sep < 1) return;
+        var id = part.slice(0, sep).trim();
+        var v = part.slice(sep + 1).trim().toUpperCase();
+        if (id && (v === "A" || v === "B")) overrides[id] = v;
+      });
+      return Object.keys(overrides).length ? overrides : null;
     } catch (e) {
-      // noop
+      return null;
     }
   }
+
+  // Renders a fixed toolbar at the bottom of the page showing the active preview
+  // state. Does not fire analytics events, does not persist assignments.
+  function showPreviewBanner(experiments, overrides) {
+    try {
+      if (document.getElementById("dml-ab-preview-bar")) return;
+
+      var bar = document.createElement("div");
+      bar.id = "dml-ab-preview-bar";
+      bar.style.cssText = [
+        "position:fixed", "bottom:0", "left:0", "right:0",
+        "z-index:2147483647",
+        "background:#18181b", "color:#fff",
+        "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+        "font-size:13px", "line-height:1",
+        "padding:10px 16px",
+        "display:flex", "align-items:center", "gap:10px", "flex-wrap:wrap",
+        "box-shadow:0 -2px 16px rgba(0,0,0,.5)",
+      ].join(";");
+
+      var label = document.createElement("span");
+      label.style.cssText = "font-weight:700;color:#fbbf24;white-space:nowrap";
+      label.textContent = "🧪 Preview Mode";
+      bar.appendChild(label);
+
+      var divider = document.createElement("span");
+      divider.style.cssText = "color:#52525b";
+      divider.textContent = "|";
+      bar.appendChild(divider);
+
+      var hasExperiment = false;
+      experiments.forEach(function (exp) {
+        var currentVariant = overrides[exp.id];
+        if (!currentVariant) return;
+        hasExperiment = true;
+
+        var name = document.createElement("span");
+        name.style.cssText = "color:#a1a1aa;white-space:nowrap";
+        name.textContent = exp.name + ":";
+        bar.appendChild(name);
+
+        ["A", "B"].forEach(function (v) {
+          var url = new URL(window.location.href);
+          var updated = Object.assign({}, overrides);
+          updated[exp.id] = v;
+          url.searchParams.set(
+            PREVIEW_PARAM,
+            Object.keys(updated).map(function (k) { return k + ":" + updated[k]; }).join(","),
+          );
+          var btn = document.createElement("a");
+          btn.href = url.toString();
+          btn.textContent = v === "A" ? "Original (A)" : "Variant (B)";
+          var active = currentVariant === v;
+          btn.style.cssText = [
+            "display:inline-block", "padding:4px 10px", "border-radius:4px",
+            "text-decoration:none", "font-size:12px", "font-weight:600", "white-space:nowrap",
+            active ? "background:#005bd3;color:#fff" : "background:#27272a;color:#a1a1aa",
+          ].join(";");
+          bar.appendChild(btn);
+        });
+      });
+
+      if (!hasExperiment) {
+        var noExp = document.createElement("span");
+        noExp.style.cssText = "color:#71717a;font-style:italic";
+        noExp.textContent = "No active experiment found on this page";
+        bar.appendChild(noExp);
+      }
+
+      var spacer = document.createElement("span");
+      spacer.style.cssText = "flex:1;min-width:8px";
+      bar.appendChild(spacer);
+
+      var exitUrl = new URL(window.location.href);
+      exitUrl.searchParams.delete(PREVIEW_PARAM);
+      var exitBtn = document.createElement("a");
+      exitBtn.href = exitUrl.toString();
+      exitBtn.textContent = "✕ Exit Preview";
+      exitBtn.style.cssText = [
+        "display:inline-block", "padding:4px 10px", "border-radius:4px",
+        "background:#27272a", "color:#71717a",
+        "text-decoration:none", "font-size:12px", "font-weight:600", "white-space:nowrap",
+      ].join(";");
+      bar.appendChild(exitBtn);
+
+      document.body.appendChild(bar);
+    } catch (e) {}
+  }
+
+  // ─── Experiment application ───────────────────────────────────────────────
 
   function tagClarity(experimentId, experimentName, variant) {
     if (typeof window.clarity !== "function") return;
@@ -153,7 +259,6 @@
   function setCartAttributes(assignments) {
     var keys = Object.keys(assignments);
     if (!keys.length) return;
-
     fetch("/cart/update.js", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -204,8 +309,9 @@
 
   function applyExperiment(exp, options) {
     options = options || {};
-    var selectorA = exp.variants.A;
-    var selectorB = exp.variants.B;
+    var selectorA = exp.variants && exp.variants.A;
+    var selectorB = exp.variants && exp.variants.B;
+    if (!selectorA || !selectorB) return;
     var nodeA = document.querySelector(selectorA);
     var nodeB = document.querySelector(selectorB);
     if (!nodeA || !nodeB) return;
@@ -237,7 +343,7 @@
     var changed = false;
     liveExperimentsState.forEach(function (exp) {
       if (!exp.verificationMode) return;
-      var shown = applyExperiment(exp);
+      var shown = applyExperiment(exp, { skipImpression: true });
       if (shown && assignments[exp.id] !== shown) {
         assignments[exp.id] = shown;
         changed = true;
@@ -249,46 +355,64 @@
     }
   }
 
-  // Apply last known assignments immediately to reduce refresh flicker.
+  // ─── Bootstrap ────────────────────────────────────────────────────────────
+
+  var visitorId = getOrCreateVisitorId();
+  var sessionId = getOrCreateSessionId();
+  var isReturningVisitor = readReturningFlag();
+  var previewOverrides = getPreviewOverrides();
+
+  // Apply cached assignments immediately to reduce flicker for returning visitors.
+  // The anti-flicker CSS in the liquid block already handles this via <style> injection,
+  // but this restores display values that may have been reset by theme JS.
   var cached = getCachedExperiments();
   if (cached.pagePath === location.pathname) {
     cached.experiments.forEach(function (exp) {
-      applyExperiment(exp, { skipImpression: true });
+      var forApply = previewOverrides && previewOverrides[exp.id]
+        ? Object.assign({}, exp, { variant: previewOverrides[exp.id] })
+        : exp;
+      applyExperiment(forApply, { skipImpression: true });
     });
   }
 
   fetch(
     cfg.appBaseUrl +
-      "/api/experiments/active?shop=" +
-      encodeURIComponent(cfg.shopDomain) +
-      "&path=" +
-      encodeURIComponent(location.pathname) +
-      "&template=" +
-      encodeURIComponent(cfg.template || "") +
-      "&visitorId=" +
-      encodeURIComponent(visitorId) +
-      "&sessionId=" +
-      encodeURIComponent(sessionId) +
-      "&isReturning=" +
-      (isReturningVisitor ? "1" : "0"),
-    {
-      credentials: "omit",
-      cache: "no-store",
-    },
+      "/api/experiments/active?shop=" + encodeURIComponent(cfg.shopDomain) +
+      "&path=" + encodeURIComponent(location.pathname) +
+      "&template=" + encodeURIComponent(cfg.template || "") +
+      "&visitorId=" + encodeURIComponent(visitorId) +
+      "&sessionId=" + encodeURIComponent(sessionId) +
+      "&isReturning=" + (isReturningVisitor ? "1" : "0"),
+    { credentials: "omit", cache: "no-store" },
   )
-    .then(function (r) {
-      return r.json();
-    })
+    .then(function (r) { return r.json(); })
     .then(function (data) {
+      var experiments = data.experiments || [];
+
+      if (previewOverrides) {
+        // Preview mode: override variants, skip analytics, skip saving assignments.
+        var previewExps = experiments.map(function (exp) {
+          var override = previewOverrides[exp.id];
+          return override ? Object.assign({}, exp, { variant: override }) : exp;
+        });
+        liveExperimentsState = previewExps;
+        previewExps.forEach(function (exp) {
+          applyExperiment(exp, { skipImpression: true });
+        });
+        saveCachedExperiments(previewExps);
+        showPreviewBanner(previewExps, previewOverrides);
+        return;
+      }
+
+      // Normal mode.
       var assignments = getAssignments();
-      var liveExperiments = data.experiments || [];
-      liveExperimentsState = liveExperiments;
-      liveExperiments.forEach(function (exp) {
+      liveExperimentsState = experiments;
+      experiments.forEach(function (exp) {
         var assigned = applyExperiment(exp) || exp.variant;
         assignments[exp.id] = assigned;
         tagClarity(exp.id, exp.name, assigned);
       });
-      saveCachedExperiments(liveExperiments);
+      saveCachedExperiments(experiments);
       saveAssignments(assignments);
       setCartAttributes(assignments);
       markVisitorSeen();
@@ -300,6 +424,7 @@
   setInterval(runVerificationTicks, 1000);
 
   document.addEventListener("submit", function (event) {
+    if (previewOverrides) return;
     var form = event.target;
     if (!(form instanceof HTMLFormElement)) return;
     var action = form.getAttribute("action") || "";

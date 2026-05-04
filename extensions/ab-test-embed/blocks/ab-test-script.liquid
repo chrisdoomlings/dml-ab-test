@@ -27,28 +27,53 @@
   })(window,document,"clarity","script","{{ block.settings.clarity_project_id | escape }}");
 </script>
 {% endif %}
+
+<!--
+  Anti-flicker: runs synchronously so returning visitors never see both variants.
+  Reads the assignment cookie + cached selectors from localStorage, then writes a
+  <style> tag into <head> that hides the losing selector before the DOM paints.
+  New visitors (no cookie) will still get the async apply below — one-time flicker
+  is unavoidable without server-side rendering.
+-->
 <script>
   (function () {
     try {
+      var cookieMatch = document.cookie.match(/(?:^|;\s*)dml_ab_assignments=([^;]+)/);
+      if (!cookieMatch) return;
+      var assignments = JSON.parse(decodeURIComponent(cookieMatch[1]) || "{}");
+      if (!assignments || typeof assignments !== "object") return;
+
       var raw = localStorage.getItem("dml_ab_experiments");
       if (!raw) return;
-      var cached = JSON.parse(raw);
-      var payload = Array.isArray(cached)
-        ? { pagePath: window.location.pathname, experiments: cached }
-        : cached;
-      if (!payload || payload.pagePath !== window.location.pathname) return;
-      (payload.experiments || []).forEach(function (exp) {
-        if (!exp || !exp.variants) return;
-        var nodeA = document.querySelector(exp.variants.A);
-        var nodeB = document.querySelector(exp.variants.B);
-        if (!nodeA || !nodeB) return;
-        var showA = exp.variant === "A";
-        nodeA.style.display = showA ? "" : "none";
-        nodeB.style.display = showA ? "none" : "";
-      });
+      var cache = JSON.parse(raw);
+      var exps;
+      if (Array.isArray(cache)) {
+        exps = cache;
+      } else if (cache && typeof cache === "object" && Array.isArray(cache.experiments)) {
+        if (cache.pagePath !== window.location.pathname) return;
+        exps = cache.experiments;
+      } else {
+        return;
+      }
+
+      var css = "";
+      for (var i = 0; i < exps.length; i++) {
+        var exp = exps[i];
+        var v = assignments[exp.id];
+        if (!v || !exp.variants) continue;
+        var hide = v === "A" ? exp.variants.B : exp.variants.A;
+        if (hide) css += hide + "{display:none!important}";
+      }
+
+      if (!css) return;
+      var style = document.createElement("style");
+      style.id = "dml-ab-af";
+      style.textContent = css;
+      document.head.appendChild(style);
     } catch (e) {
-      // noop
+      // noop — never break the page
     }
   })();
 </script>
-<script src="{{ 'ab-test.js' | asset_url }}"></script>
+
+<script src="{{ 'ab-test.js' | asset_url }}" defer></script>
