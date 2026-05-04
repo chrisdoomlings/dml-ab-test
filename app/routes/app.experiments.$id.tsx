@@ -141,6 +141,11 @@ function VariantCard({
   );
 }
 
+function formatPValue(p: number) {
+  if (p < 0.001) return "p < 0.001";
+  return `p = ${p.toFixed(3)}`;
+}
+
 export default function ExperimentDetailsPage() {
   const { experiment } = useLoaderData<typeof loader>();
   const navigation = useNavigation();
@@ -191,7 +196,16 @@ export default function ExperimentDetailsPage() {
         <InlineGrid columns={{ xs: 1, sm: 2, md: 4 }} gap="300">
           <MetricCard label="Visitors" value={experiment.visitors.toLocaleString()} detail={`A ${experiment.visitorsA.toLocaleString()} / B ${experiment.visitorsB.toLocaleString()}`} />
           <MetricCard label="Lift" value={signedPercent(experiment.cvrLift)} detail="Conversion rate goal" />
-          <MetricCard label="Progress" value={experiment.certaintyScore >= 85 ? "Significant" : "Learning"} detail={`${experiment.certaintyScore}% certainty`} />
+          <MetricCard
+            label="Statistical significance"
+            value={experiment.significant ? "Significant" : "Not yet"}
+            detail={experiment.significant
+              ? `${formatPValue(experiment.pValue)} · ${experiment.confidence}% confident`
+              : experiment.samplesNeeded > 0
+                ? `${formatPValue(experiment.pValue)} · ~${experiment.samplesNeeded.toLocaleString()} more visitors needed`
+                : formatPValue(experiment.pValue)
+            }
+          />
           <MetricCard label="Revenue" value={money(experiment.revenueA + experiment.revenueB)} detail="Orders data after approval" />
         </InlineGrid>
 

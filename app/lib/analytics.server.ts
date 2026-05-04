@@ -97,7 +97,10 @@ export function summarizeExperiment(experiment: ExperimentWithVariants, summary:
   const aovB = rate(revenueB, purchasesB);
   const cvrLift = lift(cvrA, cvrB);
   const rpvLift = lift(rpvA, rpvB);
-  const certaintyScore = certainty(visitorsA, visitorsB, cvrLift);
+  const { pValue, confidence, significant } = twoProportionZTest(visitorsA, purchasesA, visitorsB, purchasesB);
+  const certaintyScore = Math.round(confidence);
+  const minSample = minSampleSizePerGroup(cvrA);
+  const samplesNeeded = Math.max(0, minSample - Math.min(visitorsA, visitorsB));
   const winner: VariantKey | "Tie" = cvrA === cvrB ? "Tie" : cvrB > cvrA ? "B" : "A";
 
   return {
@@ -144,6 +147,10 @@ export function summarizeExperiment(experiment: ExperimentWithVariants, summary:
     aovB,
     cvrLift,
     rpvLift,
+    pValue,
+    confidence,
+    significant,
+    samplesNeeded,
     certaintyScore,
     winner,
   };

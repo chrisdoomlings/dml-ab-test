@@ -102,7 +102,7 @@ export default function AnalyticsPage() {
           <Box padding="400" borderBlockEndWidth="025" borderColor="border">
             <InlineStack align="space-between" blockAlign="center">
               <Text as="h2" variant="headingMd">Experiment performance</Text>
-              <Badge tone="success">Certainty model</Badge>
+              <Badge tone="success">Two-proportion z-test · α = 0.05</Badge>
             </InlineStack>
           </Box>
           <table className="analytics-table">
@@ -114,7 +114,7 @@ export default function AnalyticsPage() {
                 <th>Lift</th>
                 <th>Revenue</th>
                 <th>RPV</th>
-                <th>Certainty</th>
+                <th>Significance</th>
               </tr>
             </thead>
             <tbody>
@@ -126,7 +126,16 @@ export default function AnalyticsPage() {
                   <td><Badge tone={experiment.cvrLift >= 0 ? "success" : "critical"}>{signedPercent(experiment.cvrLift)}</Badge></td>
                   <td>{money(experiment.revenueA + experiment.revenueB)}</td>
                   <td>{money(experiment.rpvB)}</td>
-                  <td>{experiment.certaintyScore}%</td>
+                  <td>
+                    <BlockStack gap="050">
+                      <Badge tone={experiment.significant ? "success" : undefined}>
+                        {experiment.significant ? `${experiment.confidence}% conf.` : "Gathering data"}
+                      </Badge>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        {experiment.pValue < 0.001 ? "p < 0.001" : `p = ${experiment.pValue.toFixed(3)}`}
+                      </Text>
+                    </BlockStack>
+                  </td>
                 </tr>
               ))}
             </tbody>

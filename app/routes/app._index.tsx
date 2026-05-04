@@ -148,9 +148,14 @@ export default function AppIndex() {
                       </Badge>
                     </td>
                     <td>
-                      <Badge tone={experiment.certaintyScore >= 85 ? "success" : undefined}>
-                        {experiment.certaintyScore >= 85 ? "Significant" : "Gathering data"}
-                      </Badge>
+                      <BlockStack gap="050">
+                        <Badge tone={experiment.significant ? "success" : undefined}>
+                          {experiment.significant ? "Significant" : "Gathering data"}
+                        </Badge>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          {experiment.pValue < 0.001 ? "p < 0.001" : `p = ${experiment.pValue.toFixed(3)}`}
+                        </Text>
+                      </BlockStack>
                     </td>
                     <td>{percent(experiment.cvrB)} variant</td>
                   </tr>
