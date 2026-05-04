@@ -134,6 +134,12 @@
     }
   }
 
+  function tagClarity(experimentId, experimentName, variant) {
+    if (typeof window.clarity !== "function") return;
+    window.clarity("set", "ab_variant_" + experimentId, variant);
+    window.clarity("set", "ab_experiment", experimentName + ":" + variant);
+  }
+
   function track(payload) {
     payload.shopDomain = cfg.shopDomain;
     return fetch(cfg.appBaseUrl + "/api/events/track", {
@@ -278,7 +284,9 @@
       var liveExperiments = data.experiments || [];
       liveExperimentsState = liveExperiments;
       liveExperiments.forEach(function (exp) {
-        assignments[exp.id] = applyExperiment(exp) || exp.variant;
+        var assigned = applyExperiment(exp) || exp.variant;
+        assignments[exp.id] = assigned;
+        tagClarity(exp.id, exp.name, assigned);
       });
       saveCachedExperiments(liveExperiments);
       saveAssignments(assignments);

@@ -33,10 +33,33 @@ function lift(control: number, variant: number) {
   return (variant - control) / control;
 }
 
-function certainty(visitorsA: number, visitorsB: number, liftValue: number) {
-  const sampleScore = Math.min(1, (visitorsA + visitorsB) / 1000);
-  const effectScore = Math.min(1, Math.abs(liftValue) * 8);
-  return Math.round((0.5 + sampleScore * 0.28 + effectScore * 0.2) * 100);
+// Abramowitz & Stegun approximation of the standard normal CDF (max error 7.5e-8)
+function normalCDF(z: number): number {
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const poly = t * (0.31938153 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+  const phi = 1 - (1 / Math.sqrt(2 * Math.PI)) * Math.exp(-0.5 * z * z) * poly;
+  return z >= 0 ? phi : 1 - phi;
+}
+
+// Two-proportion z-test (two-tailed). Returns p-value and derived confidence.
+function twoProportionZTest(nA: number, cA: number, nB: number, cB: number) {
+  if (nA < 1 || nB < 1) return { pValue: 1, confidence: 0, significant: false };
+  const pPool = (cA + cB) / (nA + nB);
+  const se = Math.sqrt(pPool * (1 - pPool) * (1 / nA + 1 / nB));
+  if (se === 0) return { pValue: 1, confidence: 0, significant: false };
+  const z = Math.abs(cB / nB - cA / nA) / se;
+  const pValue = 2 * (1 - normalCDF(z));
+  const confidence = Math.round((1 - pValue) * 1000) / 10; // one decimal, e.g. 95.3
+  return { pValue, confidence, significant: pValue < 0.05 };
+}
+
+// Minimum visitors per group needed to detect a 10% relative lift at α=0.05, power=80%.
+function minSampleSizePerGroup(baselineRate: number): number {
+  if (baselineRate <= 0 || baselineRate >= 1) return 1000;
+  const delta = baselineRate * 0.1;
+  const pB = Math.min(baselineRate + delta, 0.999);
+  const z = 2.802; // z_α/2 + z_β = 1.96 + 0.842
+  return Math.ceil((z * z * (baselineRate * (1 - baselineRate) + pB * (1 - pB))) / (delta * delta));
 }
 
 export function statusLabel(status: ExperimentStatus) {

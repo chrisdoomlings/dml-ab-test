@@ -26,6 +26,11 @@ export function isRateLimited(request: Request, keyParts: Array<string | null | 
 
   if (!existing || existing.resetAt <= now) {
     rateBuckets.set(key, { count: 1, resetAt: now + WINDOW_MS });
+    if (rateBuckets.size > 5000) {
+      for (const [k, v] of rateBuckets) {
+        if (v.resetAt <= now) rateBuckets.delete(k);
+      }
+    }
     return false;
   }
 
