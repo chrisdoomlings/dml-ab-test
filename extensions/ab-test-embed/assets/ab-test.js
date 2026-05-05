@@ -276,7 +276,6 @@
     console.log("[DML AB]", payload.eventType, payload);
     return fetch(cfg.appBaseUrl + "/api/events/track", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       keepalive: true,
       body: JSON.stringify(payload),
     }).then(function (r) {
