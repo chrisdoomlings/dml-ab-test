@@ -31,6 +31,7 @@ export default function AppLayout() {
         <a href="/app/pricing">Pricing Badge</a>
         <a href="/app/settings">Settings</a>
       </NavMenu>
+
       <Outlet />
     </AppProvider>
   );
