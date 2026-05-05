@@ -72,6 +72,57 @@ export async function updateExperimentStatus(input: {
   });
 }
 
+export async function updateExperiment(input: {
+  id: string;
+  shopId: string;
+  name: string;
+  targetType: "ALL_PAGES" | "TEMPLATE" | "PATH_PREFIX" | "EXACT_PATH";
+  targetValue?: string;
+  trafficSplitA: number;
+  selectorA: string;
+  selectorB: string;
+  startsAt?: Date | null;
+  endsAt?: Date | null;
+  assignmentMode?: AssignmentMode;
+  assignmentTtlDays?: number | null;
+  audienceRule?: AudienceRule;
+  verificationMode?: boolean;
+  verificationSwapSeconds?: number | null;
+}) {
+  const exists = await prisma.experiment.findFirst({
+    where: { id: input.id, shopId: input.shopId },
+    select: { id: true },
+  });
+  if (!exists) throw new Response("Not found", { status: 404 });
+
+  await prisma.$transaction([
+    prisma.experiment.update({
+      where: { id: input.id },
+      data: {
+        name: input.name,
+        targetType: input.targetType,
+        targetValue: input.targetValue ?? null,
+        trafficSplitA: input.trafficSplitA,
+        startsAt: input.startsAt ?? null,
+        endsAt: input.endsAt ?? null,
+        assignmentMode: input.assignmentMode,
+        assignmentTtlDays: input.assignmentTtlDays ?? null,
+        audienceRule: input.audienceRule,
+        verificationMode: input.verificationMode ?? false,
+        verificationSwapSeconds: input.verificationSwapSeconds ?? null,
+      },
+    }),
+    prisma.variant.updateMany({
+      where: { experimentId: input.id, key: "A" },
+      data: { selector: input.selectorA },
+    }),
+    prisma.variant.updateMany({
+      where: { experimentId: input.id, key: "B" },
+      data: { selector: input.selectorB },
+    }),
+  ]);
+}
+
 export function deleteExperiment(input: { id: string; shopId: string }) {
   return prisma.experiment.deleteMany({
     where: { id: input.id, shopId: input.shopId },

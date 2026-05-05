@@ -175,30 +175,25 @@ export default function ExperimentDetailsPage() {
               <Badge tone={experiment.status === "ACTIVE" ? "success" : undefined}>{experiment.statusLabel}</Badge>
               <Text as="p" tone="subdued">A {experiment.trafficSplitA}% / B {100 - experiment.trafficSplitA}%</Text>
             </InlineStack>
-            <Form method="post">
-              <ButtonGroup>
+            <InlineStack gap="200">
+              <Button url={`/app/experiments/${experiment.id}/edit`}>Edit rules</Button>
+              <Form method="post">
                 <input type="hidden" name="intent" value="ACTIVE" />
                 <Button submit disabled={isSubmitting || experiment.status === "ACTIVE"}>Activate</Button>
-              </ButtonGroup>
-            </Form>
-            <Form method="post">
-              <ButtonGroup>
+              </Form>
+              <Form method="post">
                 <input type="hidden" name="intent" value="PAUSED" />
                 <Button submit disabled={isSubmitting || experiment.status === "PAUSED"}>Pause</Button>
-              </ButtonGroup>
-            </Form>
-            <Form method="post">
-              <ButtonGroup>
+              </Form>
+              <Form method="post">
                 <input type="hidden" name="intent" value="STOPPED" />
                 <Button submit disabled={isSubmitting || experiment.status === "STOPPED"}>Stop</Button>
-              </ButtonGroup>
-            </Form>
-            <Form method="post">
-              <ButtonGroup>
+              </Form>
+              <Form method="post">
                 <input type="hidden" name="intent" value="delete" />
                 <Button submit tone="critical" disabled={isSubmitting}>Delete</Button>
-              </ButtonGroup>
-            </Form>
+              </Form>
+            </InlineStack>
           </InlineStack>
         </Card>
 
