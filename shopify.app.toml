@@ -8,7 +8,7 @@ automatically_update_urls_on_dev = true
 dev_store_url = ""
 
 [access_scopes]
-scopes = "read_themes"
+scopes = "read_themes,read_orders"
 
 [auth]
 redirect_urls = [
@@ -19,6 +19,10 @@ redirect_urls = [
 
 [webhooks]
 api_version = "2025-01"
+
+  [[webhooks.subscriptions]]
+  topics = [ "orders/create" ]
+  uri = "/webhooks/orders_create"
 
 [pos]
 embedded = false
