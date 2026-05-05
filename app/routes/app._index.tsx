@@ -238,6 +238,7 @@ export default function ImageSwapPage() {
           />
         </InlineGrid>
 
+
         <Card>
           <BlockStack gap="300">
             <InlineStack align="space-between">
