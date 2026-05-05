@@ -457,6 +457,21 @@
   {% endfor %}
 </style>
 
+{%- assign dml_ab_enabled_count = 0 -%}
+{%- assign dml_ab_active_title = "" -%}
+{%- for block in section.blocks -%}
+  {%- if block.settings.ab_test_enable -%}
+    {%- assign dml_ab_enabled_count = dml_ab_enabled_count | plus: 1 -%}
+    {%- assign dml_ab_active_title = block.settings.package_title -%}
+  {%- endif -%}
+{%- endfor -%}
+
+{%- if dml_ab_enabled_count > 1 -%}
+  <div style="background:#c40000;color:#fff;padding:14px 20px;margin-bottom:12px;border-radius:6px;font-weight:700;font-size:14px;text-align:center;">
+    ⚠️ DML A/B Test conflict — {{ dml_ab_enabled_count }} blocks have the image test enabled. Only ONE block should be active at a time. Disable the others in Theme Customizer.
+  </div>
+{%- endif -%}
+
 <div class="container large-section packages-container section-{{ section.id }}-padding">
   <div class="page-width">
     <h2 id="sectionTitle" class="section_title">{{ section.settings.section_title }}</h2>

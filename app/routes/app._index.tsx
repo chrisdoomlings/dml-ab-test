@@ -129,6 +129,27 @@ export default function ImageSwapPage() {
     >
       <BlockStack gap="400">
 
+        {/* Setup rules card — always visible */}
+        <Card>
+          <BlockStack gap="300">
+            <Text as="h2" variant="headingMd">Setup rules</Text>
+            <BlockStack gap="150">
+              <Text as="p" variant="bodySm">
+                ✅ &nbsp;Go to <Text as="span" fontWeight="semibold">Theme Customizer → Packages section</Text>
+              </Text>
+              <Text as="p" variant="bodySm">
+                ✅ &nbsp;Tick <Text as="span" fontWeight="semibold">"Enable image A/B test"</Text> on <Text as="span" fontWeight="semibold">exactly one</Text> block and upload its Variant B image
+              </Text>
+              <Text as="p" variant="bodySm" tone="critical">
+                ❌ &nbsp;Do <Text as="span" fontWeight="semibold">not</Text> enable the checkbox on more than one block — a red warning will appear on the storefront if you do
+              </Text>
+              <Text as="p" variant="bodySm">
+                ✅ &nbsp;Once the theme is saved, click <Text as="span" fontWeight="semibold">Activate</Text> below to start tracking
+              </Text>
+            </BlockStack>
+          </BlockStack>
+        </Card>
+
         {experiment.status === "DRAFT" && (
           <Banner title="Test is not active" tone="warning">
             <Text as="p" variant="bodySm">
