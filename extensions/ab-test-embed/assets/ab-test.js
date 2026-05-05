@@ -527,21 +527,50 @@
     var form = event.target;
     if (!(form instanceof HTMLFormElement)) return;
     var action = form.getAttribute("action") || "";
-    if (action.indexOf("/cart/add") !== -1) {
-      var assignments = getAssignments();
-      setCartAttributes(assignments);
-      Object.keys(assignments).forEach(function (experimentId) {
-        track({
-          experimentId: experimentId,
-          visitorId: visitorId,
-          variantKey: assignments[experimentId],
-          eventType: "ADD_TO_CART",
-          pagePath: location.pathname,
-          metadata: getEngagementMeta(),
-        });
-      });
-    } else if (action === "/checkout" || action.indexOf("/checkouts/") !== -1) {
+    if (action === "/checkout" || action.indexOf("/checkouts/") !== -1) {
       fireCheckoutStarted();
     }
   });
+
+  // Intercept ALL /cart/add requests — catches standard forms, Rebuy, AJAX, and any app
+  function fireAddToCart() {
+    if (previewOverrides) return;
+    var assignments = getAssignments();
+    if (!Object.keys(assignments).length) return;
+    setCartAttributes(assignments);
+    Object.keys(assignments).forEach(function (experimentId) {
+      track({
+        experimentId: experimentId,
+        visitorId: visitorId,
+        variantKey: assignments[experimentId],
+        eventType: "ADD_TO_CART",
+        pagePath: location.pathname,
+        metadata: getEngagementMeta(),
+      });
+    });
+  }
+
+  // Intercept fetch
+  var _fetch = window.fetch;
+  window.fetch = function (input, init) {
+    var url = typeof input === "string" ? input : (input && input.url) || "";
+    if (url.indexOf("/cart/add") !== -1) {
+      return _fetch.apply(this, arguments).then(function (response) {
+        if (response.ok) fireAddToCart();
+        return response;
+      });
+    }
+    return _fetch.apply(this, arguments);
+  };
+
+  // Intercept XMLHttpRequest (older themes / some apps)
+  var _open = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function (method, url) {
+    if (typeof url === "string" && url.indexOf("/cart/add") !== -1) {
+      this.addEventListener("load", function () {
+        if (this.status >= 200 && this.status < 300) fireAddToCart();
+      });
+    }
+    return _open.apply(this, arguments);
+  };
 })();
