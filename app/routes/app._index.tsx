@@ -232,8 +232,9 @@ export default function ImageSwapPage() {
           />
           <MetricCard
             label="Revenue"
+            tip="Total revenue attributed to each variant via the orders/create webhook"
             value={money(experiment.revenueA + experiment.revenueB)}
-            detail="Requires read_orders approval"
+            detail={`A: ${money(experiment.revenueA)} · B: ${money(experiment.revenueB)}`}
           />
         </InlineGrid>
 
