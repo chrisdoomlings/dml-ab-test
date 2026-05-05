@@ -1,3 +1,105 @@
+{%- assign installments = block.settings.installments | default: 4 -%}
+{%- assign selected_variant = product.selected_or_first_available_variant -%}
+{%- assign variant_price = selected_variant.price | default: 0 -%}
+{%- assign installment_price = variant_price | divided_by: installments -%}
+
+{%- if product -%}
+  <div
+    id="dml-shop-pay-badge-{{ block.id }}"
+    class="dml-shop-pay-badge"
+    data-installments="{{ installments }}"
+    data-money-format="{{ shop.money_format | escape }}"
+    data-initial-price="{{ variant_price }}"
+    style="
+      display:flex;
+      align-items:center;
+      gap:6px;
+      padding:10px 0;
+      color:{{ block.settings.text_color }};
+      font-size:{{ block.settings.font_size }}px;
+      line-height:1.4;
+    "
+    {{ block.shopify_attributes }}
+  >
+    <svg width="18" height="12" viewBox="0 0 38 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="flex-shrink:0">
+      <path d="M6.76 0C4.36 0 2.4 1.54 2.4 3.44c0 1.6 1.14 2.68 3.02 3.16l1.66.42c1.04.26 1.52.68 1.52 1.32 0 .76-.78 1.28-1.92 1.28-1.24 0-2.08-.6-2.22-1.6H2.1C2.28 10.18 4.1 11.6 6.7 11.6c2.54 0 4.4-1.44 4.4-3.46 0-1.62-1.06-2.72-3.1-3.22L6.34 4.5c-1-.26-1.46-.64-1.46-1.24 0-.72.72-1.22 1.82-1.22 1.14 0 1.88.58 2.02 1.52h2.3C10.82 1.38 9.1 0 6.76 0zm8.78.18L12.2 11.42h2.44l.66-2.2h3.56l.66 2.2h2.44L18.6.18h-3.06zm1.52 2.08l1.28 4.98h-2.54l1.26-4.98zm7.14-2.08v11.24H26.6V7.18h2.52c2.56 0 4.14-1.42 4.14-3.52S31.66.18 29.12.18h-4.92zm2.4 1.94h2.28c1.1 0 1.76.6 1.76 1.58 0 .98-.66 1.56-1.76 1.56H26.6V2.12zm8.84-1.94v11.24H38V.18h-2.56z" fill="{{ block.settings.icon_color }}"/>
+    </svg>
+    <span>
+      Available in <strong>{{ installments }}</strong> monthly payments of
+      <strong class="dml-installment-price">{{ installment_price | money }}</strong>
+      through <strong>Shop Pay Installments</strong>
+    </span>
+  </div>
+
+  <script>
+  (function () {
+    var badge = document.getElementById('dml-shop-pay-badge-{{ block.id }}');
+    if (!badge) return;
+
+    var installments = parseInt(badge.dataset.installments, 10) || 4;
+    var moneyFormat = badge.dataset.moneyFormat || '${{amount}}';
+    var priceEl = badge.querySelector('.dml-installment-price');
+    var initialPrice = parseInt(badge.dataset.initialPrice || '0', 10) || 0;
+
+    function formatWithMoneyFormat(cents) {
+      var amount = (cents / installments) / 100;
+      var amountFixed = amount.toFixed(2);
+      var amountNoDecimals = Math.round(amount).toString();
+      return moneyFormat
+        .replace('{{amount_no_decimals}}', amountNoDecimals)
+        .replace('{{amount}}', amountFixed);
+    }
+
+    function updatePrice(cents) {
+      if (!priceEl || !cents || cents <= 0) return;
+      priceEl.textContent = formatWithMoneyFormat(cents);
+    }
+
+    function findVariantPriceById(variantId) {
+      var analytics = window.ShopifyAnalytics;
+      if (!analytics || !analytics.meta || !analytics.meta.product || !analytics.meta.product.variants) return null;
+      var variants = analytics.meta.product.variants;
+      for (var i = 0; i < variants.length; i += 1) {
+        if (String(variants[i].id) === String(variantId)) return variants[i].price;
+      }
+      return null;
+    }
+
+    function readVariantIdFromForms() {
+      var selector = 'form[action*="/cart/add"] [name="id"]';
+      var input = document.querySelector(selector);
+      if (!input || !input.value) return null;
+      return input.value;
+    }
+
+    document.addEventListener('change', function (event) {
+      if (!event.target) return;
+      var target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if ((target.getAttribute('name') || '') !== 'id') return;
+      var variantPrice = findVariantPriceById(target.value);
+      if (variantPrice) updatePrice(variantPrice);
+    });
+
+    document.addEventListener('variant:changed', function (event) {
+      if (event.detail && event.detail.variant && event.detail.variant.price) {
+        updatePrice(event.detail.variant.price);
+      }
+    });
+
+    document.addEventListener('variantChange', function (event) {
+      if (event.detail && event.detail.variant && event.detail.variant.price) {
+        updatePrice(event.detail.variant.price);
+      }
+    });
+
+    var variantId = readVariantIdFromForms();
+    var variantPrice = variantId ? findVariantPriceById(variantId) : null;
+    updatePrice(variantPrice || initialPrice);
+  })();
+  </script>
+{%- endif -%}
+
 {% schema %}
 {
   "name": "DML Shop Pay Badge",
@@ -36,108 +138,3 @@
   ]
 }
 {% endschema %}
-
-{%- assign installments = block.settings.installments | default: 4 -%}
-{%- assign variant_price = product.selected_or_first_available_variant.price -%}
-{%- assign installment_price = variant_price | divided_by: installments -%}
-
-<div
-  id="dml-shop-pay-badge-{{ block.id }}"
-  class="dml-shop-pay-badge"
-  data-installments="{{ installments }}"
-  data-product-id="{{ product.id }}"
-  style="
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 10px 0;
-    color: {{ block.settings.text_color }};
-    font-size: {{ block.settings.font_size }}px;
-    line-height: 1.4;
-  "
-  {{ block.shopify_attributes }}
->
-  <svg width="18" height="12" viewBox="0 0 38 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="flex-shrink:0">
-    <path d="M6.76 0C4.36 0 2.4 1.54 2.4 3.44c0 1.6 1.14 2.68 3.02 3.16l1.66.42c1.04.26 1.52.68 1.52 1.32 0 .76-.78 1.28-1.92 1.28-1.24 0-2.08-.6-2.22-1.6H2.1C2.28 10.18 4.1 11.6 6.7 11.6c2.54 0 4.4-1.44 4.4-3.46 0-1.62-1.06-2.72-3.1-3.22L6.34 4.5c-1-.26-1.46-.64-1.46-1.24 0-.72.72-1.22 1.82-1.22 1.14 0 1.88.58 2.02 1.52h2.3C10.82 1.38 9.1 0 6.76 0zm8.78.18L12.2 11.42h2.44l.66-2.2h3.56l.66 2.2h2.44L18.6.18h-3.06zm1.52 2.08l1.28 4.98h-2.54l1.26-4.98zm7.14-2.08v11.24H26.6V7.18h2.52c2.56 0 4.14-1.42 4.14-3.52S31.66.18 29.12.18h-4.92zm2.4 1.94h2.28c1.1 0 1.76.6 1.76 1.58 0 .98-.66 1.56-1.76 1.56H26.6V2.12zm8.84-1.94v11.24H38V.18h-2.56z" fill="{{ block.settings.icon_color }}"/>
-  </svg>
-  <span>
-    Available in <strong>{{ installments }}</strong> monthly payments of
-    <strong class="dml-installment-price">{{ installment_price | money }}</strong>
-    through <strong>Shop Pay Installments</strong>
-  </span>
-</div>
-
-<script>
-(function () {
-  var badge = document.getElementById('dml-shop-pay-badge-{{ block.id }}');
-  if (!badge) return;
-
-  var installments = parseInt(badge.dataset.installments, 10) || 4;
-  var priceEl = badge.querySelector('.dml-installment-price');
-
-  function formatMoney(cents) {
-    var amount = cents / 100 / installments;
-    return '$' + amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  }
-
-  function updatePrice(cents) {
-    if (!cents || !priceEl) return;
-    priceEl.textContent = formatMoney(cents);
-  }
-
-  // ── Method 1: Watch the page's price element for DOM changes (works on
-  //    most themes that update the price in-place on variant selection).
-  function watchPriceElement() {
-    var priceContainer =
-      document.querySelector('[data-product-price]') ||
-      document.querySelector('.price__regular .price-item') ||
-      document.querySelector('.product__price') ||
-      document.querySelector('.price');
-
-    if (!priceContainer) return;
-
-    var observer = new MutationObserver(function () {
-      var raw = priceContainer.textContent.replace(/[^0-9.]/g, '');
-      var dollars = parseFloat(raw);
-      if (!isNaN(dollars)) updatePrice(Math.round(dollars * 100));
-    });
-
-    observer.observe(priceContainer, { childList: true, subtree: true, characterData: true });
-  }
-
-  // ── Method 2: Listen for common variant-change events fired by themes.
-  document.addEventListener('change', function (e) {
-    if (!e.target) return;
-    var name = e.target.name || '';
-    if (name !== 'id' && !e.target.classList.contains('variant-radios') &&
-        !e.target.classList.contains('product-form__input')) return;
-
-    // Give the theme JS 150 ms to update ShopifyAnalytics globals
-    setTimeout(function () {
-      var analytics = window.ShopifyAnalytics;
-      if (analytics && analytics.meta && analytics.meta.product) {
-        var variantId =
-          analytics.meta.selectedVariantId ||
-          (analytics.meta.product.variants[0] && analytics.meta.product.variants[0].id);
-        var variants = analytics.meta.product.variants;
-        for (var i = 0; i < variants.length; i++) {
-          if (String(variants[i].id) === String(variantId)) {
-            updatePrice(variants[i].price);
-            return;
-          }
-        }
-      }
-    }, 150);
-  });
-
-  // ── Method 3: Listen for Dawn / Hydrogen style custom events.
-  document.addEventListener('variant:changed', function (e) {
-    if (e.detail && e.detail.variant) updatePrice(e.detail.variant.price);
-  });
-  document.addEventListener('variantChange', function (e) {
-    if (e.detail && e.detail.variant) updatePrice(e.detail.variant.price);
-  });
-
-  watchPriceElement();
-})();
-</script>

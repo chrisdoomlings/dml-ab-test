@@ -29,10 +29,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const template = url.searchParams.get("template") ?? undefined;
 
   const headers = corsHeaders(request, shopDomain);
-  if (!request.headers.get("Origin")) {
-    return json({ experiments: [] }, { status: 403, headers });
-  }
-  if (!isAllowedStorefrontOrigin(request, shopDomain)) {
+  const origin = request.headers.get("Origin");
+  if (origin && !isAllowedStorefrontOrigin(request, shopDomain)) {
     return json({ experiments: [] }, { status: 403, headers });
   }
 

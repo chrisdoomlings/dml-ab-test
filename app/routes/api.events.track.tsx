@@ -35,10 +35,6 @@ export async function action({ request }: ActionFunctionArgs) {
     return json({ error: "Method not allowed" }, { status: 405, headers: defaultHeaders });
   }
 
-  if (!request.headers.get("Origin")) {
-    return json({ error: "Forbidden" }, { status: 403, headers: defaultHeaders });
-  }
-
   if (!isReasonableBodySize(request)) {
     return json({ error: "Payload too large" }, { status: 413, headers: defaultHeaders });
   }
@@ -58,7 +54,8 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   }
 
-  if (!isAllowedStorefrontOrigin(request, parsed.data.shopDomain)) {
+  const origin = request.headers.get("Origin");
+  if (origin && !isAllowedStorefrontOrigin(request, parsed.data.shopDomain)) {
     return json({ error: "Origin not allowed" }, { status: 403, headers });
   }
 
