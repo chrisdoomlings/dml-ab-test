@@ -30,6 +30,7 @@ export default function AppLayout() {
         <a href="/app" rel="home">
           Tests
         </a>
+        <a href="/app/experiments/new">Create test</a>
         <a href="/app/analytics">Analytics</a>
         <a href="/app/assist">Lift Assist</a>
         <a href="/app/settings">Settings</a>
