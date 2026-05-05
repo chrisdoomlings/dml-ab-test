@@ -1,5 +1,5 @@
-import { json, redirect, type ActionFunctionArgs } from "@remix-run/node";
-import { Form, useActionData, useNavigation } from "@remix-run/react";
+import { json, redirect, type ActionFunctionArgs, type LoaderFunctionArgs } from "@remix-run/node";
+import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
 import { useState } from "react";
 import { Badge, Banner, BlockStack, Box, Button, ButtonGroup, Card, Checkbox, Divider, FormLayout, InlineGrid, InlineStack, Page, Select, Text, TextField } from "@shopify/polaris";
 import { z } from "zod";
@@ -76,6 +76,14 @@ function parseDate(value?: string) {
   if (!value) return null;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const shop = await requireShopRecord(request);
+  return json({
+    defaultTrafficSplit: shop.defaultTrafficSplit,
+    defaultAssignmentMode: shop.defaultAssignmentMode,
+  });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -178,6 +186,7 @@ const PRESETS = {
 type PresetKey = keyof typeof PRESETS;
 
 export default function NewExperimentPage() {
+  const { defaultTrafficSplit, defaultAssignmentMode } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
@@ -187,12 +196,12 @@ export default function NewExperimentPage() {
     name: "",
     targetType: "ALL_PAGES",
     targetValue: "",
-    trafficSplitA: "50",
+    trafficSplitA: String(defaultTrafficSplit),
     selectorA: "",
     selectorB: "",
     startsAt: "",
     endsAt: "",
-    assignmentMode: ASSIGNMENT_MODE.STICKY,
+    assignmentMode: defaultAssignmentMode as typeof ASSIGNMENT_MODE[keyof typeof ASSIGNMENT_MODE],
     assignmentTtlDays: "",
     audienceRule: AUDIENCE_RULE.ALL_VISITORS,
     verificationMode: false,

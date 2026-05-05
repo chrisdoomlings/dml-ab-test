@@ -20,7 +20,11 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (!experiment) throw new Response("Not found", { status: 404 });
 
   const summary = await getExperimentSummary(id);
-  return json({ experiment: summarizeExperiment(experiment, summary), shopDomain: shop.shopDomain });
+  return json({
+    experiment: summarizeExperiment(experiment, summary),
+    shopDomain: shop.shopDomain,
+    certaintyThreshold: shop.certaintyThreshold,
+  });
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -120,6 +124,7 @@ function VariantCard({
   ctr,
   atc,
   rpv,
+  certaintyThreshold,
 }: {
   title: string;
   probability: number;
@@ -129,13 +134,14 @@ function VariantCard({
   ctr: number;
   atc: number;
   rpv: number;
+  certaintyThreshold: number;
 }) {
   return (
     <Card>
       <BlockStack gap="300">
         <InlineStack align="space-between" blockAlign="center">
           <Text as="h2" variant="headingMd">{title}</Text>
-          <Badge tone={probability >= 85 ? "success" : undefined}>Probability to win: {probability}%</Badge>
+          <Badge tone={probability >= certaintyThreshold ? "success" : undefined}>Probability to win: {probability}%</Badge>
         </InlineStack>
         <div className={`variant-preview ${variant === "B" ? "variant-b" : ""}`}>
           <span className="preview-label">{selector}</span>
@@ -163,7 +169,7 @@ function previewUrl(shopDomain: string, experimentId: string, targetType: string
 }
 
 export default function ExperimentDetailsPage() {
-  const { experiment, shopDomain } = useLoaderData<typeof loader>();
+  const { experiment, shopDomain, certaintyThreshold } = useLoaderData<typeof loader>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
   const probabilityB =
@@ -252,8 +258,8 @@ export default function ExperimentDetailsPage() {
         </Card>
 
         <InlineGrid columns={{ xs: 1, md: 2 }} gap="300">
-          <VariantCard title="Original" probability={probabilityA} selector={selectorFor(experiment, "A")} variant="A" visitors={experiment.visitorsA} ctr={experiment.ctrA} atc={experiment.atcA} rpv={experiment.rpvA} />
-          <VariantCard title="Variant" probability={probabilityB} selector={selectorFor(experiment, "B")} variant="B" visitors={experiment.visitorsB} ctr={experiment.ctrB} atc={experiment.atcB} rpv={experiment.rpvB} />
+          <VariantCard title="Original" probability={probabilityA} selector={selectorFor(experiment, "A")} variant="A" visitors={experiment.visitorsA} ctr={experiment.ctrA} atc={experiment.atcA} rpv={experiment.rpvA} certaintyThreshold={certaintyThreshold} />
+          <VariantCard title="Variant" probability={probabilityB} selector={selectorFor(experiment, "B")} variant="B" visitors={experiment.visitorsB} ctr={experiment.ctrB} atc={experiment.atcB} rpv={experiment.rpvB} certaintyThreshold={certaintyThreshold} />
         </InlineGrid>
 
         <Card>
