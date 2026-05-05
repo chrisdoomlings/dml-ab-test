@@ -43,7 +43,15 @@ export async function action({ request }: ActionFunctionArgs) {
     return json({ ok: true, skipped: "Bot traffic" }, { headers: defaultHeaders });
   }
 
-  const body = await request.json().catch(() => null);
+  // Use text() + manual parse so Content-Type (text/plain vs application/json) never throws
+  let body: unknown = null;
+  try {
+    const raw = await request.text();
+    body = JSON.parse(raw);
+  } catch {
+    // fall through — safeParse(null) will return a 400
+  }
+
   const parsed = TrackEventSchema.safeParse(body);
   const headers = corsHeaders(request, parsed.success ? parsed.data.shopDomain : undefined);
 
@@ -54,8 +62,7 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   }
 
-  const origin = request.headers.get("Origin");
-  if (origin && !isAllowedStorefrontOrigin(request, parsed.data.shopDomain)) {
+  if (!isAllowedStorefrontOrigin(request, parsed.data.shopDomain)) {
     return json({ error: "Origin not allowed" }, { status: 403, headers });
   }
 
@@ -63,42 +70,49 @@ export async function action({ request }: ActionFunctionArgs) {
     return json({ error: "Too many requests" }, { status: 429, headers });
   }
 
-  const experiment = await prisma.experiment.findFirst({
-    where: {
-      id: parsed.data.experimentId,
-      shop: { shopDomain: parsed.data.shopDomain },
-      status: "ACTIVE",
-    },
-    select: { verificationMode: true },
-  });
+  try {
+    const shop = await prisma.shop.findUnique({
+      where: { shopDomain: parsed.data.shopDomain },
+      select: { id: true },
+    });
 
-  if (!experiment) {
-    return json({ error: "Experiment not found" }, { status: 404, headers });
-  }
+    if (!shop) {
+      return json({ error: "Shop not found" }, { status: 404, headers });
+    }
 
-  const assignment = await prisma.visitorAssignment.findUnique({
-    where: {
-      experimentId_visitorId: {
-        experimentId: parsed.data.experimentId,
-        visitorId: parsed.data.visitorId,
+    const experiment = await prisma.experiment.findFirst({
+      where: { id: parsed.data.experimentId, shopId: shop.id, status: "ACTIVE" },
+      select: { verificationMode: true },
+    });
+
+    if (!experiment) {
+      return json({ error: "Experiment not found" }, { status: 404, headers });
+    }
+
+    const assignment = await prisma.visitorAssignment.findUnique({
+      where: {
+        experimentId_visitorId: {
+          experimentId: parsed.data.experimentId,
+          visitorId: parsed.data.visitorId,
+        },
       },
-    },
-    select: { variantKey: true },
-  });
+      select: { variantKey: true },
+    });
 
-  if (!assignment) {
-    return json({ error: "Assignment not found" }, { status: 409, headers });
+    if (!assignment) {
+      return json({ error: "Assignment not found" }, { status: 409, headers });
+    }
+
+    if (!experiment.verificationMode && assignment.variantKey !== parsed.data.variantKey) {
+      return json({ error: "Variant does not match assignment" }, { status: 409, headers });
+    }
+
+    const { shopDomain: _shopDomain, ...event } = parsed.data;
+    await trackEvent({ ...event, metadata: event.metadata ?? {} });
+
+    return json({ ok: true }, { headers });
+  } catch (err) {
+    console.error("[track] unhandled error:", err);
+    return json({ error: "Internal error" }, { status: 500, headers });
   }
-
-  if (!experiment.verificationMode && assignment.variantKey !== parsed.data.variantKey) {
-    return json({ error: "Variant does not match assignment" }, { status: 409, headers });
-  }
-
-  const { shopDomain: _shopDomain, ...event } = parsed.data;
-  await trackEvent({
-    ...event,
-    metadata: event.metadata ?? {},
-  });
-
-  return json({ ok: true }, { headers });
 }
