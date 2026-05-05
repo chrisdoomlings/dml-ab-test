@@ -273,12 +273,20 @@
 
   function track(payload) {
     payload.shopDomain = cfg.shopDomain;
+    console.log("[DML AB]", payload.eventType, payload);
     return fetch(cfg.appBaseUrl + "/api/events/track", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       keepalive: true,
       body: JSON.stringify(payload),
-    }).catch(function () {});
+    }).then(function (r) {
+      r.json().then(function (body) {
+        console.log("[DML AB]", payload.eventType, "response:", r.status, body);
+      });
+      return r;
+    }).catch(function (e) {
+      console.warn("[DML AB] track error:", e);
+    });
   }
 
   function setCartAttributes(assignments) {
@@ -309,6 +317,7 @@
   function fireCheckoutStarted() {
     if (previewOverrides) return;
     var assignments = getAssignments();
+    console.log("[DML AB] fireCheckoutStarted — assignments:", assignments);
     Object.keys(assignments).forEach(function (experimentId) {
       track({
         experimentId: experimentId,
@@ -555,7 +564,9 @@
   window.fetch = function (input, init) {
     var url = typeof input === "string" ? input : (input && input.url) || "";
     if (url.indexOf("/cart/add") !== -1) {
+      console.log("[DML AB] fetch /cart/add intercepted:", url);
       return _fetch.apply(this, arguments).then(function (response) {
+        console.log("[DML AB] /cart/add response:", response.status);
         if (response.ok) fireAddToCart();
         return response;
       });
@@ -567,7 +578,9 @@
   var _open = XMLHttpRequest.prototype.open;
   XMLHttpRequest.prototype.open = function (method, url) {
     if (typeof url === "string" && url.indexOf("/cart/add") !== -1) {
+      console.log("[DML AB] XHR /cart/add intercepted:", url);
       this.addEventListener("load", function () {
+        console.log("[DML AB] XHR /cart/add status:", this.status);
         if (this.status >= 200 && this.status < 300) fireAddToCart();
       });
     }
