@@ -146,7 +146,7 @@ function fieldError(data: ErrorData | null | undefined, field: string) {
 const PRESETS = {
   imageSwap: {
     label: "Image swap",
-    description: "Replace a section image to test different visuals — hero banners, product photos, promotional tiles.",
+    description: "Replace an image to test different visuals — hero banners, product photos, promotional tiles.",
     badge: "Most common",
     defaults: {
       name: "Image swap test",
@@ -156,10 +156,10 @@ const PRESETS = {
     },
     steps: [
       "In Theme Customizer → navigate to the page you want to test.",
-      "Click Add section → add your original image section. Note its ID from DevTools.",
-      "Click Add section → add a duplicate with your variant image. Note its ID.",
-      "Paste both section IDs below (with # prefix).",
-      "Set Target type to Template and enter the template name (e.g. index, product).",
+      'In the section where you want to swap an image, click "Add block" → Apps → "DML Image Swap".',
+      'Set a short Swap key (e.g. hero). Pick Original image (A) and Variant image (B). Save.',
+      "Back in this form, type the same Swap key in the Image swap key field below.",
+      'Set Target to "Template" and enter the template name (e.g. index, product, collection).',
     ],
   },
   shopPay: {
@@ -199,6 +199,7 @@ export default function NewExperimentPage() {
     trafficSplitA: String(defaultTrafficSplit),
     selectorA: "",
     selectorB: "",
+    swapKey: "",
     startsAt: "",
     endsAt: "",
     assignmentMode: defaultAssignmentMode as typeof ASSIGNMENT_MODE[keyof typeof ASSIGNMENT_MODE],
@@ -213,10 +214,20 @@ export default function NewExperimentPage() {
     (value: string) =>
       setFormValues((prev) => ({ ...prev, [field]: value }));
 
+  function handleSwapKey(value: string) {
+    const clean = value.replace(/\s+/g, "-").toLowerCase();
+    setFormValues((prev) => ({
+      ...prev,
+      swapKey: clean,
+      selectorA: clean ? `#dml-img-a-${clean}` : "",
+      selectorB: clean ? `#dml-img-b-${clean}` : "",
+    }));
+  }
+
   function applyPreset(key: PresetKey) {
     const preset = PRESETS[key];
     setSelectedPreset(key);
-    setFormValues((prev) => ({ ...prev, ...preset.defaults, selectorA: "", selectorB: "" }));
+    setFormValues((prev) => ({ ...prev, ...preset.defaults, selectorA: "", selectorB: "", swapKey: "" }));
   }
 
   const needsTargetValue = formValues.targetType !== "ALL_PAGES";
@@ -329,24 +340,46 @@ export default function NewExperimentPage() {
               suffix="%"
               error={fieldError(errors, "trafficSplitA")}
             />
-            <TextField
-              label="Original selector / section ID"
-              name="selectorA"
-              value={formValues.selectorA}
-              onChange={setField("selectorA")}
-              autoComplete="off"
-              placeholder="#section-hero-original"
-              error={fieldError(errors, "selectorA")}
-            />
-            <TextField
-              label="Variant selector / section ID"
-              name="selectorB"
-              value={formValues.selectorB}
-              onChange={setField("selectorB")}
-              autoComplete="off"
-              placeholder="#section-hero-variant"
-              error={fieldError(errors, "selectorB")}
-            />
+            {selectedPreset === "imageSwap" ? (
+              <>
+                <TextField
+                  label="Image swap key"
+                  value={formValues.swapKey}
+                  onChange={handleSwapKey}
+                  autoComplete="off"
+                  placeholder="e.g. hero"
+                  helpText={
+                    formValues.swapKey
+                      ? `Selectors: #dml-img-a-${formValues.swapKey} / #dml-img-b-${formValues.swapKey}`
+                      : "Must match the Swap key you set on the DML Image Swap block in Theme Customizer."
+                  }
+                  error={fieldError(errors, "selectorA")}
+                />
+                <input type="hidden" name="selectorA" value={formValues.selectorA} />
+                <input type="hidden" name="selectorB" value={formValues.selectorB} />
+              </>
+            ) : (
+              <>
+                <TextField
+                  label="Original selector / section ID"
+                  name="selectorA"
+                  value={formValues.selectorA}
+                  onChange={setField("selectorA")}
+                  autoComplete="off"
+                  placeholder="#section-hero-original"
+                  error={fieldError(errors, "selectorA")}
+                />
+                <TextField
+                  label="Variant selector / section ID"
+                  name="selectorB"
+                  value={formValues.selectorB}
+                  onChange={setField("selectorB")}
+                  autoComplete="off"
+                  placeholder="#section-hero-variant"
+                  error={fieldError(errors, "selectorB")}
+                />
+              </>
+            )}
             <TextField
               label="Start at (optional)"
               name="startsAt"

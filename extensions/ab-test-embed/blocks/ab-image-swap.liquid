@@ -1,0 +1,87 @@
+{% schema %}
+{
+  "name": "DML Image Swap",
+  "target": "section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "swap_key",
+      "label": "Swap key",
+      "placeholder": "e.g. hero",
+      "info": "Short unique name — enter this same value in the DML AB Test app as the Image swap key."
+    },
+    {
+      "type": "image_picker",
+      "id": "image_a",
+      "label": "Original image (A)"
+    },
+    {
+      "type": "image_picker",
+      "id": "image_b",
+      "label": "Variant image (B)"
+    },
+    {
+      "type": "range",
+      "id": "width",
+      "label": "Image width (px)",
+      "min": 400,
+      "max": 2400,
+      "step": 100,
+      "default": 1920
+    },
+    {
+      "type": "select",
+      "id": "fit",
+      "label": "Image fit",
+      "options": [
+        { "value": "cover", "label": "Cover" },
+        { "value": "contain", "label": "Contain" },
+        { "value": "fill", "label": "Fill" }
+      ],
+      "default": "cover"
+    },
+    {
+      "type": "text",
+      "id": "height",
+      "label": "Image height (CSS value)",
+      "placeholder": "e.g. 500px or 60vh",
+      "default": "500px"
+    }
+  ]
+}
+{% endschema %}
+
+{%- assign key = block.settings.swap_key | strip -%}
+{%- assign img_a = block.settings.image_a -%}
+{%- assign img_b = block.settings.image_b -%}
+{%- assign img_width = block.settings.width | default: 1920 -%}
+
+{%- if key != blank and img_a != blank and img_b != blank -%}
+  {%- assign src_a = img_a | image_url: width: img_width -%}
+  {%- assign src_b = img_b | image_url: width: img_width -%}
+
+  <div {{ block.shopify_attributes }} style="position:relative">
+    <img
+      id="dml-img-a-{{ key }}"
+      src="{{ src_a }}"
+      alt="{{ img_a.alt | escape }}"
+      width="{{ img_a.width }}"
+      height="{{ img_a.height }}"
+      loading="lazy"
+      style="display:block;width:100%;height:{{ block.settings.height }};object-fit:{{ block.settings.fit }}"
+    >
+    <img
+      id="dml-img-b-{{ key }}"
+      src="{{ src_b }}"
+      alt="{{ img_b.alt | escape }}"
+      width="{{ img_b.width }}"
+      height="{{ img_b.height }}"
+      loading="lazy"
+      style="display:block;width:100%;height:{{ block.settings.height }};object-fit:{{ block.settings.fit }}"
+    >
+  </div>
+{%- elsif key == blank -%}
+  <div style="padding:16px;border:2px dashed #ccc;text-align:center;color:#999;font-size:13px" {{ block.shopify_attributes }}>
+    DML Image Swap — enter a Swap key and pick both images in the block settings.
+  </div>
+{%- endif -%}
