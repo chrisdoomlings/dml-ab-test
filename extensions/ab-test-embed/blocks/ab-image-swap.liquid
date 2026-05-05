@@ -27,7 +27,7 @@
       "min": 400,
       "max": 2400,
       "step": 100,
-      "default": 1920
+      "default": 1200
     },
     {
       "type": "select",
@@ -54,7 +54,7 @@
 {%- assign key = block.settings.swap_key | strip -%}
 {%- assign img_a = block.settings.image_a -%}
 {%- assign img_b = block.settings.image_b -%}
-{%- assign img_width = block.settings.width | default: 1920 -%}
+{%- assign img_width = block.settings.width | default: 1200 -%}
 
 {%- if key != blank and img_a != blank and img_b != blank -%}
   {%- assign src_a = img_a | image_url: width: img_width -%}
