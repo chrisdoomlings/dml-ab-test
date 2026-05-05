@@ -516,16 +516,24 @@
   }, { passive: true });
 
   // Detect clicks on checkout links (mini-cart, header cart button, etc.)
+  function isCheckoutUrl(url) {
+    return url === "/checkout" || url.indexOf("/checkout") === 0 || url.indexOf("/checkouts/") !== -1;
+  }
+
   document.addEventListener("click", function (event) {
     if (previewOverrides) return;
     var el = event.target;
     while (el && el.tagName) {
-      if (el.tagName === "A") {
+      var tag = el.tagName;
+      // <a href="/checkout"> or <a href="/checkouts/...">
+      if (tag === "A") {
         var href = el.getAttribute("href") || "";
-        if (href === "/checkout" || href.indexOf("/checkouts/") !== -1) {
-          fireCheckoutStarted();
-          return;
-        }
+        if (isCheckoutUrl(href)) { fireCheckoutStarted(); return; }
+      }
+      // <button name="checkout"> — standard Shopify cart page button
+      if ((tag === "BUTTON" || tag === "INPUT") && el.getAttribute("name") === "checkout") {
+        console.log("[DML AB] checkout button clicked");
+        fireCheckoutStarted(); return;
       }
       el = el.parentElement;
     }
@@ -536,7 +544,8 @@
     var form = event.target;
     if (!(form instanceof HTMLFormElement)) return;
     var action = form.getAttribute("action") || "";
-    if (action === "/checkout" || action.indexOf("/checkouts/") !== -1) {
+    if (isCheckoutUrl(action)) {
+      console.log("[DML AB] checkout form submitted:", action);
       fireCheckoutStarted();
     }
   });
