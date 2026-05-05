@@ -545,6 +545,25 @@
     var form = event.target;
     if (!(form instanceof HTMLFormElement)) return;
     var action = form.getAttribute("action") || "";
+    var submitter = event.submitter;
+    var submitterName =
+      submitter && typeof submitter.getAttribute === "function"
+        ? submitter.getAttribute("name")
+        : "";
+
+    // Standard non-AJAX add-to-cart form submit.
+    if (action.indexOf("/cart/add") !== -1) {
+      console.log("[DML AB] cart add form submitted:", action);
+      fireAddToCart();
+    }
+
+    // Cart form checkout submit (`/cart` action + submitter name "checkout").
+    if (action.indexOf("/cart") !== -1 && submitterName === "checkout") {
+      console.log("[DML AB] cart checkout submitted via /cart form");
+      fireCheckoutStarted();
+      return;
+    }
+
     if (isCheckoutUrl(action)) {
       console.log("[DML AB] checkout form submitted:", action);
       fireCheckoutStarted();
