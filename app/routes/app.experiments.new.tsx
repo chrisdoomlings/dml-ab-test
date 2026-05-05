@@ -1,7 +1,7 @@
 import { json, redirect, type ActionFunctionArgs } from "@remix-run/node";
 import { Form, useActionData, useNavigation } from "@remix-run/react";
 import { useState } from "react";
-import { BlockStack, Button, ButtonGroup, Card, Checkbox, FormLayout, Page, Select, TextField } from "@shopify/polaris";
+import { Badge, Banner, BlockStack, Box, Button, ButtonGroup, Card, Checkbox, Divider, FormLayout, InlineGrid, InlineStack, Page, Select, Text, TextField } from "@shopify/polaris";
 import { z } from "zod";
 import { createExperiment } from "../models/experiments.server";
 import { requireShopRecord } from "../lib/shop.server";
@@ -135,10 +135,53 @@ function fieldError(data: ErrorData | null | undefined, field: string) {
   return data?.errors?.fieldErrors?.[field]?.[0];
 }
 
+const PRESETS = {
+  imageSwap: {
+    label: "Image swap",
+    description: "Replace a section image to test different visuals — hero banners, product photos, promotional tiles.",
+    badge: "Most common",
+    defaults: {
+      name: "Image swap test",
+      targetType: "TEMPLATE",
+      targetValue: "index",
+      trafficSplitA: "50",
+    },
+    steps: [
+      "In Theme Customizer → navigate to the page you want to test.",
+      "Click Add section → add your original image section. Note its ID from DevTools.",
+      "Click Add section → add a duplicate with your variant image. Note its ID.",
+      "Paste both section IDs below (with # prefix).",
+      "Set Target type to Template and enter the template name (e.g. index, product).",
+    ],
+  },
+  shopPay: {
+    label: "Shop Pay Installments badge",
+    description: "Test whether showing monthly payment pricing under the Add to Cart button increases conversions.",
+    badge: "Preset block included",
+    defaults: {
+      name: "Shop Pay installments badge",
+      targetType: "TEMPLATE",
+      targetValue: "product",
+      trafficSplitA: "50",
+    },
+    steps: [
+      "In Theme Customizer → navigate to a product page.",
+      "Open the main Product section → click Add block → Apps.",
+      'Add "DML AB Test Placeholder" — this is the control (invisible). Copy its block ID from DevTools.',
+      'Add "DML Shop Pay Badge" and position it directly below the Add to Cart button. Copy its block ID.',
+      "Paste both block IDs below (with # prefix). The placeholder is Selector A, the badge is Selector B.",
+      "The badge automatically reads the product price and updates when the variant changes.",
+    ],
+  },
+} as const;
+
+type PresetKey = keyof typeof PRESETS;
+
 export default function NewExperimentPage() {
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
+  const [selectedPreset, setSelectedPreset] = useState<PresetKey | null>(null);
 
   const [formValues, setFormValues] = useState({
     name: "",
@@ -155,10 +198,17 @@ export default function NewExperimentPage() {
     verificationMode: false,
     verificationSwapSeconds: "5",
   });
+
   const setField =
     (field: keyof typeof formValues) =>
     (value: string) =>
       setFormValues((prev) => ({ ...prev, [field]: value }));
+
+  function applyPreset(key: PresetKey) {
+    const preset = PRESETS[key];
+    setSelectedPreset(key);
+    setFormValues((prev) => ({ ...prev, ...preset.defaults, selectorA: "", selectorB: "" }));
+  }
 
   const needsTargetValue = formValues.targetType !== "ALL_PAGES";
   const targetValueHelp =
@@ -167,6 +217,7 @@ export default function NewExperimentPage() {
     "e.g. /products/my-item";
 
   const errors = actionData && !actionData.ok ? (actionData as ErrorData) : null;
+  const activePreset = selectedPreset ? PRESETS[selectedPreset] : null;
 
   return (
     <Page
@@ -174,8 +225,60 @@ export default function NewExperimentPage() {
       subtitle="Launch a selector-based A/B test with analytics tracking."
       backAction={{ content: "Tests", url: "/app" }}
     >
-      <Card>
-        <Form method="post">
+      <BlockStack gap="400">
+
+        <Card>
+          <BlockStack gap="300">
+            <Text as="h2" variant="headingMd">Quick start — choose a preset</Text>
+            <InlineGrid columns={{ xs: 1, sm: 2 }} gap="300">
+              {(Object.entries(PRESETS) as [PresetKey, typeof PRESETS[PresetKey]][]).map(([key, preset]) => (
+                <Box
+                  key={key}
+                  padding="400"
+                  borderWidth="025"
+                  borderRadius="200"
+                  borderColor={selectedPreset === key ? "border-focus" : "border"}
+                  background={selectedPreset === key ? "bg-surface-selected" : "bg-surface"}
+                >
+                  <BlockStack gap="200">
+                    <InlineStack align="space-between" blockAlign="start">
+                      <Text as="p" variant="bodyMd" fontWeight="semibold">{preset.label}</Text>
+                      <Badge tone={key === "imageSwap" ? undefined : "info"}>{preset.badge}</Badge>
+                    </InlineStack>
+                    <Text as="p" tone="subdued" variant="bodySm">{preset.description}</Text>
+                    <Button
+                      size="slim"
+                      variant={selectedPreset === key ? "primary" : "secondary"}
+                      onClick={() => applyPreset(key)}
+                    >
+                      {selectedPreset === key ? "Selected" : "Use this preset"}
+                    </Button>
+                  </BlockStack>
+                </Box>
+              ))}
+            </InlineGrid>
+            {selectedPreset && (
+              <Button plain onClick={() => setSelectedPreset(null)}>
+                Clear preset — start from scratch
+              </Button>
+            )}
+          </BlockStack>
+        </Card>
+
+        {activePreset && (
+          <Banner title={`Setup steps — ${activePreset.label}`} tone="info">
+            <BlockStack gap="100">
+              {activePreset.steps.map((step, i) => (
+                <Text key={i} as="p" variant="bodySm">
+                  {i + 1}. {step}
+                </Text>
+              ))}
+            </BlockStack>
+          </Banner>
+        )}
+
+        <Card>
+          <Form method="post">
           <FormLayout>
             <TextField
               label="Experiment name"
@@ -314,6 +417,8 @@ export default function NewExperimentPage() {
           </FormLayout>
         </Form>
       </Card>
+
+      </BlockStack>
     </Page>
   );
 }
