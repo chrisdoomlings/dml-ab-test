@@ -27,12 +27,8 @@ export default function AppLayout() {
     <AppProvider isEmbeddedApp apiKey={apiKey} host={host}>
       <TitleBar title="DML AB Test" />
       <NavMenu>
-        <a href="/app" rel="home">
-          Tests
-        </a>
-        <a href="/app/experiments/new">Create test</a>
-        <a href="/app/analytics">Analytics</a>
-        <a href="/app/assist">Lift Assist</a>
+        <a href="/app" rel="home">Image Swap</a>
+        <a href="/app/pricing">Pricing Badge</a>
         <a href="/app/settings">Settings</a>
       </NavMenu>
       <Outlet />

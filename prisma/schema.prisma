@@ -51,7 +51,8 @@ model Experiment {
   assignmentTtlDays Int?
   audienceRule      AudienceRule        @default(ALL_VISITORS)
   verificationMode  Boolean             @default(false)
-  verificationSwapSeconds Int? 
+  verificationSwapSeconds Int?
+  type              String?
   status            ExperimentStatus    @default(DRAFT)
   startsAt          DateTime?
   endsAt            DateTime?

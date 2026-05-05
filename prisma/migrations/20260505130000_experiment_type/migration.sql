@@ -1,0 +1,1 @@
+ALTER TABLE "Experiment" ADD COLUMN IF NOT EXISTS "type" TEXT;
