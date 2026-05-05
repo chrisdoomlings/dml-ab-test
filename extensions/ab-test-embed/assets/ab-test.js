@@ -9,6 +9,7 @@
   var EXPERIMENTS_KEY = "dml_ab_experiments";
   var ASSIGNMENT_COOKIE = "dml_ab_assignments";
   var PREVIEW_PARAM = "dml_ab_preview";
+  var FETCH_TIMEOUT_MS = 6000;
   var liveExperimentsState = [];
 
   // ─── Visitor / session identity ──────────────────────────────────────────
@@ -38,17 +39,11 @@
   }
 
   function readReturningFlag() {
-    try {
-      return localStorage.getItem(RETURNING_KEY) === "1";
-    } catch (e) {
-      return false;
-    }
+    try { return localStorage.getItem(RETURNING_KEY) === "1"; } catch (e) { return false; }
   }
 
   function markVisitorSeen() {
-    try {
-      localStorage.setItem(RETURNING_KEY, "1");
-    } catch (e) {}
+    try { localStorage.setItem(RETURNING_KEY, "1"); } catch (e) {}
   }
 
   // ─── Cookie helpers ───────────────────────────────────────────────────────
@@ -70,15 +65,19 @@
     } catch (e) {}
   }
 
+  function clearCookie(name) {
+    try {
+      document.cookie = name + "=; path=/; max-age=0; SameSite=Lax";
+    } catch (e) {}
+  }
+
   // ─── Assignment storage ───────────────────────────────────────────────────
 
   function parseAssignments(text) {
     try {
       var parsed = JSON.parse(text || "{}");
       return parsed && typeof parsed === "object" ? parsed : {};
-    } catch (e) {
-      return {};
-    }
+    } catch (e) { return {}; }
   }
 
   function getAssignments() {
@@ -88,10 +87,18 @@
   }
 
   function saveAssignments(map) {
-    try {
-      localStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify(map));
-    } catch (e) {}
+    try { localStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify(map)); } catch (e) {}
     writeCookie(ASSIGNMENT_COOKIE, encodeURIComponent(JSON.stringify(map)), 60 * 60 * 24 * 30);
+  }
+
+  function clearAllAssignments() {
+    try {
+      localStorage.removeItem(ASSIGNMENTS_KEY);
+      localStorage.removeItem(EXPERIMENTS_KEY);
+      localStorage.removeItem(VISITOR_KEY);
+      localStorage.removeItem(RETURNING_KEY);
+    } catch (e) {}
+    clearCookie(ASSIGNMENT_COOKIE);
   }
 
   // ─── Experiment cache ─────────────────────────────────────────────────────
@@ -99,12 +106,8 @@
   function getCachedExperiments() {
     try {
       var cached = JSON.parse(localStorage.getItem(EXPERIMENTS_KEY) || "[]");
-      if (Array.isArray(cached)) {
-        return { pagePath: location.pathname, experiments: cached };
-      }
-      if (!cached || typeof cached !== "object") {
-        return { pagePath: "", experiments: [] };
-      }
+      if (Array.isArray(cached)) return { pagePath: location.pathname, experiments: cached };
+      if (!cached || typeof cached !== "object") return { pagePath: "", experiments: [] };
       return {
         pagePath: String(cached.pagePath || ""),
         experiments: Array.isArray(cached.experiments) ? cached.experiments : [],
@@ -118,19 +121,25 @@
     try {
       localStorage.setItem(
         EXPERIMENTS_KEY,
-        JSON.stringify({
-          pagePath: location.pathname,
-          savedAt: Date.now(),
-          experiments: experiments || [],
-        }),
+        JSON.stringify({ pagePath: location.pathname, savedAt: Date.now(), experiments: experiments || [] }),
       );
     } catch (e) {}
   }
 
+  // ─── Anti-flicker CSS management ─────────────────────────────────────────
+  //
+  // The liquid block injects a <style id="dml-ab-af"> that hides the losing
+  // selector using !important. This must be removed after the JS applies
+  // inline display values — otherwise the !important rule fights inline styles
+  // and can prevent a variant from being revealed (e.g. after a TTL re-roll).
+
+  function removeAntiFlickerStyle() {
+    var el = document.getElementById("dml-ab-af");
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+  }
+
   // ─── Preview mode ─────────────────────────────────────────────────────────
 
-  // Parses ?dml_ab_preview=expId:A,expId2:B from the URL.
-  // Returns a map of { experimentId -> "A"|"B" } or null if not in preview mode.
   function getPreviewOverrides() {
     try {
       var params = new URLSearchParams(window.location.search);
@@ -145,13 +154,9 @@
         if (id && (v === "A" || v === "B")) overrides[id] = v;
       });
       return Object.keys(overrides).length ? overrides : null;
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { return null; }
   }
 
-  // Renders a fixed toolbar at the bottom of the page showing the active preview
-  // state. Does not fire analytics events, does not persist assignments.
   function showPreviewBanner(experiments, overrides) {
     try {
       if (document.getElementById("dml-ab-preview-bar")) return;
@@ -222,11 +227,29 @@
       spacer.style.cssText = "flex:1;min-width:8px";
       bar.appendChild(spacer);
 
+      // Reset button — clears stored assignment so next normal visit gets a
+      // fresh random roll, useful for testing both sides of the split.
+      var resetBtn = document.createElement("button");
+      resetBtn.textContent = "↺ Reset visitor";
+      resetBtn.title = "Clears stored assignment so the next page load gets a fresh random variant";
+      resetBtn.style.cssText = [
+        "padding:4px 10px", "border-radius:4px", "border:none", "cursor:pointer",
+        "background:#27272a", "color:#a1a1aa",
+        "font-size:12px", "font-weight:600", "white-space:nowrap", "font-family:inherit",
+      ].join(";");
+      resetBtn.addEventListener("click", function () {
+        clearAllAssignments();
+        var url = new URL(window.location.href);
+        url.searchParams.delete(PREVIEW_PARAM);
+        window.location.href = url.toString();
+      });
+      bar.appendChild(resetBtn);
+
       var exitUrl = new URL(window.location.href);
       exitUrl.searchParams.delete(PREVIEW_PARAM);
       var exitBtn = document.createElement("a");
       exitBtn.href = exitUrl.toString();
-      exitBtn.textContent = "✕ Exit Preview";
+      exitBtn.textContent = "✕ Exit";
       exitBtn.style.cssText = [
         "display:inline-block", "padding:4px 10px", "border-radius:4px",
         "background:#27272a", "color:#71717a",
@@ -362,9 +385,10 @@
   var isReturningVisitor = readReturningFlag();
   var previewOverrides = getPreviewOverrides();
 
-  // Apply cached assignments immediately to reduce flicker for returning visitors.
-  // The anti-flicker CSS in the liquid block already handles this via <style> injection,
-  // but this restores display values that may have been reset by theme JS.
+  // Apply cached assignments immediately (before the API fetch) so returning
+  // visitors see the correct variant with no delay. The anti-flicker <style>
+  // in the liquid block already handles the first paint; this reinforces it
+  // with inline styles which survive theme reflows.
   var cached = getCachedExperiments();
   if (cached.pagePath === location.pathname) {
     cached.experiments.forEach(function (exp) {
@@ -375,6 +399,20 @@
     });
   }
 
+  // Build a fetch with a hard timeout. If the app server is slow (e.g. cold
+  // start), we abort after FETCH_TIMEOUT_MS and remove the anti-flicker CSS so
+  // the page is usable. On returning visits the cached pre-apply above already
+  // shows the right variant; on first visits we fall back to showing both
+  // (fail-open = original content stays visible).
+  var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+
+  var fetchTimeoutId = setTimeout(function () {
+    if (controller) controller.abort();
+    // Anti-flicker CSS must be removed whether we timed out or not — if it
+    // stays, its !important rule blocks inline styles from showing the variant.
+    removeAntiFlickerStyle();
+  }, FETCH_TIMEOUT_MS);
+
   fetch(
     cfg.appBaseUrl +
       "/api/experiments/active?shop=" + encodeURIComponent(cfg.shopDomain) +
@@ -383,14 +421,23 @@
       "&visitorId=" + encodeURIComponent(visitorId) +
       "&sessionId=" + encodeURIComponent(sessionId) +
       "&isReturning=" + (isReturningVisitor ? "1" : "0"),
-    { credentials: "omit", cache: "no-store" },
+    {
+      credentials: "omit",
+      cache: "no-store",
+      signal: controller ? controller.signal : undefined,
+    },
   )
     .then(function (r) { return r.json(); })
     .then(function (data) {
+      clearTimeout(fetchTimeoutId);
+      // Must remove anti-flicker CSS before applying new inline styles.
+      // If the variant changed since the last visit (e.g. TTL re-roll), the
+      // old !important rule would block the new variant from being shown.
+      removeAntiFlickerStyle();
+
       var experiments = data.experiments || [];
 
       if (previewOverrides) {
-        // Preview mode: override variants, skip analytics, skip saving assignments.
         var previewExps = experiments.map(function (exp) {
           var override = previewOverrides[exp.id];
           return override ? Object.assign({}, exp, { variant: override }) : exp;
@@ -404,7 +451,6 @@
         return;
       }
 
-      // Normal mode.
       var assignments = getAssignments();
       liveExperimentsState = experiments;
       experiments.forEach(function (exp) {
@@ -418,7 +464,9 @@
       markVisitorSeen();
     })
     .catch(function () {
-      // fail-open: theme default section remains visible
+      clearTimeout(fetchTimeoutId);
+      removeAntiFlickerStyle();
+      // Fail-open: original content (variant A / theme default) remains visible.
     });
 
   setInterval(runVerificationTicks, 1000);

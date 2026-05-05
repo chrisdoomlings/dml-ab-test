@@ -156,7 +156,10 @@ export default function ExperimentDetailsPage() {
   const { experiment, shopDomain } = useLoaderData<typeof loader>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
-  const probabilityB = experiment.winner === "B" ? experiment.certaintyScore : 100 - experiment.certaintyScore;
+  const probabilityB =
+    experiment.winner === "Tie" ? 50 :
+    experiment.winner === "B" ? experiment.certaintyScore :
+    100 - experiment.certaintyScore;
   const probabilityA = 100 - probabilityB;
 
   return (
