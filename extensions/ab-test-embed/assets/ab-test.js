@@ -280,8 +280,10 @@
       keepalive: true,
       body: JSON.stringify(payload),
     }).then(function (r) {
-      r.json().then(function (body) {
+      r.clone().json().then(function (body) {
         console.log("[DML AB]", payload.eventType, "response:", r.status, body);
+      }).catch(function () {
+        console.log("[DML AB]", payload.eventType, "response:", r.status, "(no body)");
       });
       return r;
     }).catch(function (e) {

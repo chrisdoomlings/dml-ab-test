@@ -1,4 +1,4 @@
-import { json, type ActionFunctionArgs } from "@remix-run/node";
+import { json, type ActionFunctionArgs, type LoaderFunctionArgs } from "@remix-run/node";
 import { z } from "zod";
 import { trackEvent } from "../models/experiments.server";
 import { corsHeaders, isAllowedStorefrontOrigin, optionsResponse } from "../lib/cors.server";
@@ -19,6 +19,12 @@ const TrackEventSchema = z.object({
   orderId: z.string().max(255).optional(),
   metadata: z.record(z.any()).optional(),
 });
+
+// Remix/Vercel may route OPTIONS to loader instead of action
+export async function loader({ request }: LoaderFunctionArgs) {
+  if (request.method === "OPTIONS") return optionsResponse(request);
+  return json({ error: "Method not allowed" }, { status: 405, headers: corsHeaders(request) });
+}
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method === "OPTIONS") return optionsResponse(request);

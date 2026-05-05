@@ -17,6 +17,8 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  if (request.method === "OPTIONS") return optionsResponse(request);
+
   const url = new URL(request.url);
   const shopDomain = requireParam(url, "shop", 255);
   const path = requireParam(url, "path", 2048);
