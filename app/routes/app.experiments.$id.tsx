@@ -2,7 +2,7 @@ import { json, redirect, type ActionFunctionArgs, type LoaderFunctionArgs } from
 import { Form, useLoaderData, useNavigation } from "@remix-run/react";
 import { ExperimentStatus } from "@prisma/client";
 import { Badge, BlockStack, Box, Button, ButtonGroup, Card, InlineGrid, InlineStack, Page, Text } from "@shopify/polaris";
-import { deleteExperiment, getExperimentSummary, updateExperimentStatus } from "../models/experiments.server";
+import { clearExperimentData, deleteExperiment, getExperimentSummary, simulateTraffic, updateExperimentStatus } from "../models/experiments.server";
 import { summarizeExperiment } from "../lib/analytics.server";
 import { money, percent, signedPercent } from "../lib/format";
 import { prisma } from "../lib/db.server";
@@ -34,6 +34,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (intent === "delete") {
     await deleteExperiment({ id, shopId: shop.id });
     return redirect("/app");
+  }
+
+  if (intent === "simulate") {
+    await simulateTraffic(id, shop.id, 50);
+    return redirect(`/app/experiments/${id}`);
+  }
+
+  if (intent === "clearData") {
+    await clearExperimentData(id, shop.id);
+    return redirect(`/app/experiments/${id}`);
   }
 
   if (["DRAFT", "ACTIVE", "PAUSED", "STOPPED"].includes(intent)) {
@@ -247,39 +257,71 @@ export default function ExperimentDetailsPage() {
         </InlineGrid>
 
         <Card>
-          <BlockStack gap="300">
+          <BlockStack gap="400">
             <BlockStack gap="100">
               <Text as="h2" variant="headingMd">Test mode</Text>
               <Text as="p" tone="subdued">
-                Open your storefront with a forced variant to visually verify the experiment.
-                A floating toolbar lets you toggle between variants without affecting analytics data.
+                Preview the experiment on your storefront, or simulate visitor traffic to populate
+                the analytics dashboard without waiting for real users.
               </Text>
             </BlockStack>
-            <InlineStack gap="200" blockAlign="center" wrap>
-              <Button
-                url={previewUrl(shopDomain, experiment.id, experiment.targetType, experiment.targetValue ?? null, "A")}
-                external
-              >
-                Preview Original (A)
-              </Button>
-              <Button
-                url={previewUrl(shopDomain, experiment.id, experiment.targetType, experiment.targetValue ?? null, "B")}
-                external
-                variant="primary"
-              >
-                Preview Variant (B)
-              </Button>
-            </InlineStack>
-            <Text as="p" tone="subdued" variant="bodySm">
-              Selectors — Original: <Text as="span" fontWeight="semibold">{selectorFor(experiment, "A")}</Text>
-              {" · "}
-              Variant: <Text as="span" fontWeight="semibold">{selectorFor(experiment, "B")}</Text>
-            </Text>
-            {experiment.status !== "ACTIVE" && (
-              <Text as="p" tone="caution" variant="bodySm">
-                This experiment is not active. Preview links will open the page but no variant will be forced — activate the experiment first.
+
+            <BlockStack gap="200">
+              <Text as="p" variant="bodyMd" fontWeight="semibold">Storefront preview</Text>
+              <Text as="p" tone="subdued" variant="bodySm">
+                Opens your store with a forced variant. A floating toolbar lets you toggle between
+                variants without affecting real analytics.
               </Text>
-            )}
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Button
+                  url={previewUrl(shopDomain, experiment.id, experiment.targetType, experiment.targetValue ?? null, "A")}
+                  external
+                >
+                  Preview Original (A)
+                </Button>
+                <Button
+                  url={previewUrl(shopDomain, experiment.id, experiment.targetType, experiment.targetValue ?? null, "B")}
+                  external
+                  variant="primary"
+                >
+                  Preview Variant (B)
+                </Button>
+              </InlineStack>
+              <Text as="p" tone="subdued" variant="bodySm">
+                Selectors — Original: <Text as="span" fontWeight="semibold">{selectorFor(experiment, "A")}</Text>
+                {" · "}
+                Variant: <Text as="span" fontWeight="semibold">{selectorFor(experiment, "B")}</Text>
+              </Text>
+              {experiment.status !== "ACTIVE" && (
+                <Text as="p" tone="caution" variant="bodySm">
+                  Activate the experiment first — preview links only force the variant when the experiment is live.
+                </Text>
+              )}
+            </BlockStack>
+
+            <BlockStack gap="200">
+              <Text as="p" variant="bodyMd" fontWeight="semibold">Simulate traffic</Text>
+              <Text as="p" tone="subdued" variant="bodySm">
+                Generates 50 fake visitors with realistic impression → click → purchase events so
+                you can see how the analytics dashboard looks. Variant B is set ~2× better than
+                Original to demonstrate a meaningful lift. Use "Clear data" to remove all simulated
+                and real analytics records for this experiment.
+              </Text>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Form method="post">
+                  <input type="hidden" name="intent" value="simulate" />
+                  <Button submit loading={isSubmitting} variant="primary">
+                    Simulate 50 visitors
+                  </Button>
+                </Form>
+                <Form method="post">
+                  <input type="hidden" name="intent" value="clearData" />
+                  <Button submit tone="critical" loading={isSubmitting}>
+                    Clear all data
+                  </Button>
+                </Form>
+              </InlineStack>
+            </BlockStack>
           </BlockStack>
         </Card>
       </BlockStack>

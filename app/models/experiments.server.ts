@@ -242,3 +242,73 @@ export async function getExperimentSummary(experimentId: string) {
 
   return { assignments, events, attributions };
 }
+
+// Simulated conversion funnel rates per variant.
+// B is intentionally better so the stats dashboard shows a realistic lift.
+const SIM = {
+  A: { ctr: 0.30, atc: 0.18, cvr: 0.10 },
+  B: { ctr: 0.48, atc: 0.30, cvr: 0.20 },
+} as const;
+
+export async function simulateTraffic(experimentId: string, shopId: string, count = 50) {
+  const experiment = await prisma.experiment.findFirst({
+    where: { id: experimentId, shopId },
+    select: { trafficSplitA: true },
+  });
+  if (!experiment) throw new Response("Not found", { status: 404 });
+
+  const now = Date.now();
+  const assignments: Prisma.VisitorAssignmentCreateManyInput[] = [];
+  const events: Prisma.EventUncheckedCreateInput[] = [];
+  const attributions: Prisma.OrderAttributionUncheckedCreateInput[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const variantKey: VariantKey =
+      Math.random() * 100 < experiment.trafficSplitA ? "A" : "B";
+    const visitorId = `sim_${now}_${i}_${Math.random().toString(36).slice(2, 8)}`;
+    const rates = SIM[variantKey];
+
+    assignments.push({ experimentId, visitorId, variantKey });
+    events.push({ experimentId, visitorId, variantKey, eventType: "IMPRESSION", metadata: { simulated: true } });
+
+    if (Math.random() < rates.ctr) {
+      events.push({ experimentId, visitorId, variantKey, eventType: "CLICK", metadata: { simulated: true } });
+    }
+    if (Math.random() < rates.atc) {
+      events.push({ experimentId, visitorId, variantKey, eventType: "ADD_TO_CART", metadata: { simulated: true } });
+    }
+    if (Math.random() < rates.cvr) {
+      const revenue = Math.round((40 + Math.random() * 120) * 100) / 100;
+      const orderId = `sim_ord_${now}_${i}`;
+      events.push({
+        experimentId, visitorId, variantKey,
+        eventType: "PURCHASE", eventValue: revenue, currency: "USD", orderId,
+        metadata: { simulated: true },
+      });
+      attributions.push({ experimentId, visitorId, variantKey, orderId, revenue, currency: "USD" });
+    }
+  }
+
+  await prisma.visitorAssignment.createMany({ data: assignments, skipDuplicates: true });
+  // Events don't have a unique constraint so insert sequentially to avoid bulk failures
+  for (const event of events) {
+    await prisma.event.create({ data: event });
+  }
+  if (attributions.length) {
+    await prisma.orderAttribution.createMany({ data: attributions, skipDuplicates: true });
+  }
+}
+
+export async function clearExperimentData(experimentId: string, shopId: string) {
+  const experiment = await prisma.experiment.findFirst({
+    where: { id: experimentId, shopId },
+    select: { id: true },
+  });
+  if (!experiment) throw new Response("Not found", { status: 404 });
+
+  await prisma.$transaction([
+    prisma.event.deleteMany({ where: { experimentId } }),
+    prisma.orderAttribution.deleteMany({ where: { experimentId } }),
+    prisma.visitorAssignment.deleteMany({ where: { experimentId } }),
+  ]);
+}
