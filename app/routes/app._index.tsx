@@ -1,6 +1,6 @@
 import { json, redirect, type ActionFunctionArgs, type LoaderFunctionArgs } from "@remix-run/node";
 import { Form, useLoaderData, useNavigation } from "@remix-run/react";
-import { Badge, Banner, BlockStack, Box, Button, Card, InlineGrid, InlineStack, Page, Text } from "@shopify/polaris";
+import { Badge, Banner, BlockStack, Box, Button, Card, InlineGrid, InlineStack, Page, Text, Tooltip } from "@shopify/polaris";
 import { prisma } from "../lib/db.server";
 import { requireShopRecord } from "../lib/shop.server";
 import { getExperimentSummary, updateExperimentStatus, simulateTraffic, clearExperimentData } from "../models/experiments.server";
@@ -80,11 +80,19 @@ function formatPValue(p: number) {
   return `p = ${p.toFixed(3)}`;
 }
 
-function MetricCard({ label, value, detail }: { label: string; value: string; detail: string }) {
+function Tip({ label, tip }: { label: string; tip: string }) {
+  return (
+    <Tooltip content={tip} dismissOnMouseOut>
+      <span style={{ borderBottom: "1px dotted currentColor", cursor: "help" }}>{label}</span>
+    </Tooltip>
+  );
+}
+
+function MetricCard({ label, value, detail, tip }: { label: string; value: string; detail: string; tip?: string }) {
   return (
     <Card>
       <BlockStack gap="200">
-        <Text as="p" tone="subdued">{label}</Text>
+        <Text as="p" tone="subdued">{tip ? <Tip label={label} tip={tip} /> : label}</Text>
         <Text as="p" variant="headingLg">{value}</Text>
         <Text as="p" tone="subdued">{detail}</Text>
       </BlockStack>
@@ -114,8 +122,9 @@ export default function ImageSwapPage() {
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
 
+  const hasEnoughData = experiment.visitorsA > 0 && experiment.visitorsB > 0;
   const probabilityB =
-    experiment.winner === "Tie" ? 50 :
+    !hasEnoughData || experiment.winner === "Tie" ? 50 :
     experiment.winner === "B" ? experiment.certaintyScore :
     100 - experiment.certaintyScore;
   const probabilityA = 100 - probabilityB;
@@ -207,9 +216,11 @@ export default function ImageSwapPage() {
             label="CVR lift"
             value={signedPercent(experiment.cvrLift)}
             detail={experiment.cvrLift > 0 ? "Variant B winning" : experiment.cvrLift < 0 ? "Original A winning" : "No difference yet"}
+            tip="How much better or worse Variant B converts compared to Original A"
           />
           <MetricCard
             label="Significance"
+            tip="Statistical significance — how confident we are the result is real and not random chance"
             value={experiment.significant ? "Significant" : "Not yet"}
             detail={
               experiment.significant
@@ -267,11 +278,11 @@ export default function ImageSwapPage() {
                   </Text>
                   <InlineGrid columns={2} gap="300">
                     <Text as="p" tone="subdued">Visitors<br /><Text as="span" fontWeight="semibold">{visitors.toLocaleString()}</Text></Text>
-                    <Text as="p" tone="subdued">CVR<br /><Text as="span" fontWeight="semibold">{percent(cvr)}</Text></Text>
-                    <Text as="p" tone="subdued">CTR<br /><Text as="span" fontWeight="semibold">{percent(ctr)}</Text></Text>
-                    <Text as="p" tone="subdued">Add to cart<br /><Text as="span" fontWeight="semibold">{percent(atc)}</Text></Text>
-                    <Text as="p" tone="subdued">Checkout<br /><Text as="span" fontWeight="semibold">{percent(checkoutRate)}</Text></Text>
-                    <Text as="p" tone="subdued">RPV<br /><Text as="span" fontWeight="semibold">{money(rpv)}</Text></Text>
+                    <Text as="p" tone="subdued"><Tip label="CVR" tip="Conversion Rate — % of visitors who completed a purchase" /><br /><Text as="span" fontWeight="semibold">{percent(cvr)}</Text></Text>
+                    <Text as="p" tone="subdued"><Tip label="CTR" tip="Click-Through Rate — % of visitors who clicked the product image" /><br /><Text as="span" fontWeight="semibold">{percent(ctr)}</Text></Text>
+                    <Text as="p" tone="subdued"><Tip label="Add to cart" tip="Add-to-Cart Rate — % of visitors who added the product to their cart" /><br /><Text as="span" fontWeight="semibold">{percent(atc)}</Text></Text>
+                    <Text as="p" tone="subdued"><Tip label="Checkout" tip="Checkout Rate — % of visitors who started the checkout process" /><br /><Text as="span" fontWeight="semibold">{percent(checkoutRate)}</Text></Text>
+                    <Text as="p" tone="subdued"><Tip label="RPV" tip="Revenue Per Visitor — total revenue divided by number of visitors" /><br /><Text as="span" fontWeight="semibold">{money(rpv)}</Text></Text>
                   </InlineGrid>
                 </BlockStack>
               </Card>
