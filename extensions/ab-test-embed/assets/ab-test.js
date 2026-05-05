@@ -11,6 +11,8 @@
   var PREVIEW_PARAM = "dml_ab_preview";
   var FETCH_TIMEOUT_MS = 6000;
   var liveExperimentsState = [];
+  var pageStartTime = Date.now();
+  var maxScrollDepth = 0;
 
   // ─── Visitor / session identity ──────────────────────────────────────────
 
@@ -297,6 +299,28 @@
     }).catch(function () {});
   }
 
+  function getEngagementMeta() {
+    return {
+      timeOnPageSec: Math.round((Date.now() - pageStartTime) / 1000),
+      scrollDepthPct: maxScrollDepth,
+    };
+  }
+
+  function fireCheckoutStarted() {
+    if (previewOverrides) return;
+    var assignments = getAssignments();
+    Object.keys(assignments).forEach(function (experimentId) {
+      track({
+        experimentId: experimentId,
+        visitorId: visitorId,
+        variantKey: assignments[experimentId],
+        eventType: "CHECKOUT_STARTED",
+        pagePath: location.pathname,
+        metadata: getEngagementMeta(),
+      });
+    });
+  }
+
   function bindClickTracking(activeNode, exp) {
     var marker = "dml_ab_click_" + exp.id + "_" + exp._shownVariant;
     if (activeNode.getAttribute(marker) === "1") return;
@@ -308,6 +332,7 @@
         variantKey: exp._shownVariant,
         eventType: "CLICK",
         pagePath: location.pathname,
+        metadata: getEngagementMeta(),
       });
     });
   }
@@ -471,22 +496,52 @@
 
   setInterval(runVerificationTicks, 1000);
 
+  window.addEventListener("scroll", function () {
+    var el = document.documentElement;
+    var scrolled = el.scrollTop || document.body.scrollTop || 0;
+    var total = el.scrollHeight - el.clientHeight;
+    if (total > 0) {
+      var pct = Math.min(100, Math.round((scrolled / total) * 100));
+      if (pct > maxScrollDepth) maxScrollDepth = pct;
+    }
+  }, { passive: true });
+
+  // Detect clicks on checkout links (mini-cart, header cart button, etc.)
+  document.addEventListener("click", function (event) {
+    if (previewOverrides) return;
+    var el = event.target;
+    while (el && el.tagName) {
+      if (el.tagName === "A") {
+        var href = el.getAttribute("href") || "";
+        if (href === "/checkout" || href.indexOf("/checkouts/") !== -1) {
+          fireCheckoutStarted();
+          return;
+        }
+      }
+      el = el.parentElement;
+    }
+  }, true);
+
   document.addEventListener("submit", function (event) {
     if (previewOverrides) return;
     var form = event.target;
     if (!(form instanceof HTMLFormElement)) return;
     var action = form.getAttribute("action") || "";
-    if (action.indexOf("/cart/add") === -1) return;
-    var assignments = getAssignments();
-    setCartAttributes(assignments);
-    Object.keys(assignments).forEach(function (experimentId) {
-      track({
-        experimentId: experimentId,
-        visitorId: visitorId,
-        variantKey: assignments[experimentId],
-        eventType: "ADD_TO_CART",
-        pagePath: location.pathname,
+    if (action.indexOf("/cart/add") !== -1) {
+      var assignments = getAssignments();
+      setCartAttributes(assignments);
+      Object.keys(assignments).forEach(function (experimentId) {
+        track({
+          experimentId: experimentId,
+          visitorId: visitorId,
+          variantKey: assignments[experimentId],
+          eventType: "ADD_TO_CART",
+          pagePath: location.pathname,
+          metadata: getEngagementMeta(),
+        });
       });
-    });
+    } else if (action === "/checkout" || action.indexOf("/checkouts/") !== -1) {
+      fireCheckoutStarted();
+    }
   });
 })();

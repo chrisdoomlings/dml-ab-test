@@ -91,6 +91,8 @@ export function summarizeExperiment(experiment: ExperimentWithVariants, summary:
   const ctrB = rate(clicksB, impressionsB);
   const atcA = rate(addsA, visitorsA);
   const atcB = rate(addsB, visitorsB);
+  const checkoutRateA = rate(checkoutsA, visitorsA);
+  const checkoutRateB = rate(checkoutsB, visitorsB);
   const rpvA = rate(revenueA, visitorsA);
   const rpvB = rate(revenueB, visitorsB);
   const aovA = rate(revenueA, purchasesA);
@@ -141,6 +143,8 @@ export function summarizeExperiment(experiment: ExperimentWithVariants, summary:
     ctrB,
     atcA,
     atcB,
+    checkoutRateA,
+    checkoutRateB,
     rpvA,
     rpvB,
     aovA,

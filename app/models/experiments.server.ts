@@ -246,8 +246,8 @@ export async function getExperimentSummary(experimentId: string) {
 // Simulated conversion funnel rates per variant.
 // B is intentionally better so the stats dashboard shows a realistic lift.
 const SIM = {
-  A: { ctr: 0.30, atc: 0.18, cvr: 0.10 },
-  B: { ctr: 0.48, atc: 0.30, cvr: 0.20 },
+  A: { ctr: 0.30, atc: 0.18, checkout: 0.14, cvr: 0.10 },
+  B: { ctr: 0.48, atc: 0.30, checkout: 0.25, cvr: 0.20 },
 } as const;
 
 export async function simulateTraffic(experimentId: string, shopId: string, count = 50) {
@@ -276,6 +276,9 @@ export async function simulateTraffic(experimentId: string, shopId: string, coun
     }
     if (Math.random() < rates.atc) {
       events.push({ experimentId, visitorId, variantKey, eventType: "ADD_TO_CART", metadata: { simulated: true } });
+    }
+    if (Math.random() < rates.checkout) {
+      events.push({ experimentId, visitorId, variantKey, eventType: "CHECKOUT_STARTED", metadata: { simulated: true } });
     }
     if (Math.random() < rates.cvr) {
       const revenue = Math.round((40 + Math.random() * 120) * 100) / 100;

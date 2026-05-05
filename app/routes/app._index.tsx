@@ -251,6 +251,7 @@ export default function ImageSwapPage() {
             const cvr = isA ? experiment.cvrA : experiment.cvrB;
             const ctr = isA ? experiment.ctrA : experiment.ctrB;
             const atc = isA ? experiment.atcA : experiment.atcB;
+            const checkoutRate = isA ? experiment.checkoutRateA : experiment.checkoutRateB;
             const rpv = isA ? experiment.rpvA : experiment.rpvB;
             return (
               <Card key={key}>
@@ -269,6 +270,7 @@ export default function ImageSwapPage() {
                     <Text as="p" tone="subdued">CVR<br /><Text as="span" fontWeight="semibold">{percent(cvr)}</Text></Text>
                     <Text as="p" tone="subdued">CTR<br /><Text as="span" fontWeight="semibold">{percent(ctr)}</Text></Text>
                     <Text as="p" tone="subdued">Add to cart<br /><Text as="span" fontWeight="semibold">{percent(atc)}</Text></Text>
+                    <Text as="p" tone="subdued">Checkout<br /><Text as="span" fontWeight="semibold">{percent(checkoutRate)}</Text></Text>
                     <Text as="p" tone="subdued">RPV<br /><Text as="span" fontWeight="semibold">{money(rpv)}</Text></Text>
                   </InlineGrid>
                 </BlockStack>
