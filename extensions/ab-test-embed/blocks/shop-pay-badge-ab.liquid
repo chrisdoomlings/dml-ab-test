@@ -8,8 +8,8 @@
 
 <style>#dml-badge-a,#dml-badge-b{display:none}</style>
 
-  <!-- Control (A): test label — remove before launch -->
-  <div id="dml-badge-a" style="padding:10px 0;font-size:{{ block.settings.font_size }}px;color:{{ block.settings.text_color }};">No badge</div>
+  <!-- Control (A): optional test label -->
+  <div id="dml-badge-a" style="padding:10px 0;font-size:{{ block.settings.font_size }}px;color:{{ block.settings.text_color }};">{% if block.settings.show_no_badge_label %}No badge{% endif %}</div>
 
   <!-- Variant (B): Shop Pay installments badge -->
   <div
@@ -88,6 +88,13 @@
     {
       "type": "paragraph",
       "content": "Place this block below the Add to Cart button. Activate the test from the app dashboard."
+    },
+    {
+      "type": "checkbox",
+      "id": "show_no_badge_label",
+      "label": "Show 'No badge' label (testing only)",
+      "default": false,
+      "info": "Enable during testing to confirm variant A is working. Turn off before launch."
     },
     {
       "type": "text",
