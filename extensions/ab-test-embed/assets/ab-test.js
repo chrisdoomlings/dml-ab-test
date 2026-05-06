@@ -581,6 +581,24 @@ function track(payload) {
     });
   }
 
+  // Capture-phase click on Add to Cart button — fires before theme JS, catches
+  // AJAX themes that store a window.fetch reference before ab-test.js loads.
+  document.addEventListener('click', function (e) {
+    var el = e.target;
+    while (el && el.tagName) {
+      var tag = el.tagName;
+      if (tag === 'BUTTON' || tag === 'INPUT') {
+        var n = el.getAttribute('name');
+        if (n === 'add' || el.hasAttribute('data-add-to-cart')) {
+          console.log('[DML AB] Add to Cart button clicked');
+          fireAddToCart();
+          return;
+        }
+      }
+      el = el.parentElement;
+    }
+  }, true);
+
   // Intercept fetch
   var _fetch = window.fetch;
   window.fetch = function (input, init) {
