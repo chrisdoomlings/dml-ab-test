@@ -377,8 +377,8 @@
     var shownVariant = resolveShownVariant(exp);
     exp._shownVariant = shownVariant;
     var showA = shownVariant === "A";
-    nodeA.style.display = showA ? "" : "none";
-    nodeB.style.display = showA ? "none" : "";
+    nodeA.style.display = showA ? "block" : "none";
+    nodeB.style.display = showA ? "none" : "block";
 
     if (!options.skipImpression) {
       track({
