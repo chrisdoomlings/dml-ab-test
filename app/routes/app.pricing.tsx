@@ -1,6 +1,7 @@
 import { json, redirect, type ActionFunctionArgs, type LoaderFunctionArgs } from "@remix-run/node";
-import { Form, useLoaderData, useNavigation } from "@remix-run/react";
-import { Badge, Banner, BlockStack, Box, Button, Card, InlineGrid, InlineStack, Page, Text, Tooltip } from "@shopify/polaris";
+import { Form, useLoaderData, useNavigation, useSubmit } from "@remix-run/react";
+import { useState } from "react";
+import { Badge, Banner, BlockStack, Box, Button, Card, InlineGrid, InlineStack, Modal, Page, Text, Tooltip } from "@shopify/polaris";
 import { prisma } from "../lib/db.server";
 import { requireShopRecord } from "../lib/shop.server";
 import { getExperimentSummary, updateExperimentStatus, simulateTraffic, clearExperimentData } from "../models/experiments.server";
@@ -120,7 +121,9 @@ function MiniChart({ cvrA, cvrB }: { cvrA: number; cvrB: number }) {
 export default function ShopPayBadgePage() {
   const { experiment, certaintyThreshold } = useLoaderData<typeof loader>();
   const navigation = useNavigation();
+  const submit = useSubmit();
   const isSubmitting = navigation.state === "submitting";
+  const [showClearModal, setShowClearModal] = useState(false);
 
   const hasEnoughData = experiment.visitorsA > 0 && experiment.visitorsB > 0;
   const probabilityB =
@@ -270,6 +273,43 @@ export default function ShopPayBadgePage() {
           })}
         </InlineGrid>
 
+        <Card>
+          <BlockStack gap="300">
+            <Text as="h2" variant="headingMd">Danger zone</Text>
+            <Text as="p" tone="subdued" variant="bodySm">
+              Permanently delete all visitors, events, and revenue data for this test. This cannot be undone.
+            </Text>
+            <InlineStack>
+              <Button tone="critical" onClick={() => setShowClearModal(true)}>Clear all data</Button>
+            </InlineStack>
+          </BlockStack>
+        </Card>
+
+        <Modal
+          open={showClearModal}
+          onClose={() => setShowClearModal(false)}
+          title="Clear all test data?"
+          primaryAction={{
+            content: "Clear all data",
+            destructive: true,
+            loading: isSubmitting,
+            onAction: () => {
+              const fd = new FormData();
+              fd.append("intent", "clearData");
+              submit(fd, { method: "post" });
+              setShowClearModal(false);
+            },
+          }}
+          secondaryActions={[{ content: "Cancel", onAction: () => setShowClearModal(false) }]}
+        >
+          <Modal.Section>
+            <Banner tone="warning">
+              <Text as="p" variant="bodySm">
+                This will permanently delete all <strong>{experiment.visitors.toLocaleString()} visitors</strong>, impressions, add-to-cart, checkout, and revenue records for this test. The test itself will remain but all collected data will be gone.
+              </Text>
+            </Banner>
+          </Modal.Section>
+        </Modal>
 
       </BlockStack>
     </Page>
