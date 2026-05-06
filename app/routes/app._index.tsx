@@ -271,24 +271,6 @@ export default function ImageSwapPage() {
           })}
         </InlineGrid>
 
-        <Card>
-          <BlockStack gap="300">
-            <Text as="h2" variant="headingMd">Test data</Text>
-            <Text as="p" tone="subdued" variant="bodySm">
-              Simulate 50 fake visitors to preview the dashboard with data. Clear removes all analytics records for this test.
-            </Text>
-            <InlineStack gap="200">
-              <Form method="post">
-                <input type="hidden" name="intent" value="simulate" />
-                <Button submit loading={isSubmitting} variant="primary">Simulate 50 visitors</Button>
-              </Form>
-              <Form method="post">
-                <input type="hidden" name="intent" value="clearData" />
-                <Button submit tone="critical" loading={isSubmitting}>Clear all data</Button>
-              </Form>
-            </InlineStack>
-          </BlockStack>
-        </Card>
 
       </BlockStack>
     </Page>
