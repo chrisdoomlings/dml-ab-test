@@ -524,14 +524,39 @@ function track(payload) {
         var href = el.getAttribute("href") || "";
         if (isCheckoutUrl(href)) { fireCheckoutStarted(); return; }
       }
-      // <button name="checkout"> — standard Shopify cart page button
-      if ((tag === "BUTTON" || tag === "INPUT") && el.getAttribute("name") === "checkout") {
-        console.log("[DML AB] checkout button clicked");
-        fireCheckoutStarted(); return;
+      if (tag === "BUTTON" || tag === "INPUT" || tag === "A") {
+        var name = el.getAttribute("name") || "";
+        var cls  = (typeof el.className === "string" ? el.className : "").toLowerCase();
+        var txt  = ((el.textContent || el.value || "").trim()).toLowerCase();
+        var tid  = (el.getAttribute("data-testid") || "").toLowerCase();
+        // Standard Shopify, Rebuy, and other third-party checkout buttons
+        if (
+          name === "checkout" ||
+          tid.indexOf("checkout") !== -1 ||
+          cls.indexOf("checkout") !== -1 ||
+          txt === "checkout" ||
+          txt === "proceed to checkout" ||
+          txt === "check out"
+        ) {
+          console.log("[DML AB] checkout button clicked:", txt || cls);
+          fireCheckoutStarted(); return;
+        }
       }
       el = el.parentElement;
     }
   }, true);
+
+  // Intercept location.assign — used by Rebuy and some themes to navigate to checkout
+  try {
+    var _locAssign = window.location.assign.bind(window.location);
+    window.location.assign = function (url) {
+      if (isCheckoutUrl(String(url || ""))) {
+        console.log("[DML AB] location.assign to checkout:", url);
+        fireCheckoutStarted();
+      }
+      return _locAssign(url);
+    };
+  } catch (e) {}
 
   document.addEventListener("submit", function (event) {
     if (previewOverrides) return;
