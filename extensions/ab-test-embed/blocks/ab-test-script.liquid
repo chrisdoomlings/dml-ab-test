@@ -3,7 +3,6 @@
   "name": "DML AB Test Embed",
   "target": "body",
   "settings": [
-    { "type": "text", "id": "app_base_url", "label": "App base URL", "default": "https://your-app-url" },
     { "type": "text", "id": "clarity_project_id", "label": "Microsoft Clarity project ID (optional)" }
   ]
 }
@@ -11,7 +10,7 @@
 
 <script>
   window.DML_AB_TEST = {
-    appBaseUrl: "{{ block.settings.app_base_url | escape }}",
+    appBaseUrl: "https://dml-ab-test.vercel.app",
     shopDomain: "{{ shop.permanent_domain | escape }}",
     template: "{{ template.name | escape }}",
     clarityProjectId: "{{ block.settings.clarity_project_id | escape }}"
