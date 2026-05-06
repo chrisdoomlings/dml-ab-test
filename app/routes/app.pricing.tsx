@@ -138,27 +138,7 @@ export default function ShopPayBadgePage() {
     >
       <BlockStack gap="400">
 
-        <Card>
-          <BlockStack gap="300">
-            <Text as="h2" variant="headingMd">Setup rules</Text>
-            <BlockStack gap="150">
-              <Text as="p" variant="bodySm">
-                ✅ &nbsp;Go to <Text as="span" fontWeight="semibold">Theme Customizer → Product page</Text>
-              </Text>
-              <Text as="p" variant="bodySm">
-                ✅ &nbsp;Add the <Text as="span" fontWeight="semibold">DML Shop Pay Badge A/B</Text> app block below the Add to Cart button
-              </Text>
-              <Text as="p" variant="bodySm">
-                ✅ &nbsp;Set installments, colors, and font size, then save and publish the theme
-              </Text>
-              <Text as="p" variant="bodySm">
-                ✅ &nbsp;Once the theme is saved, click <Text as="span" fontWeight="semibold">Activate</Text> below to start tracking
-              </Text>
-            </BlockStack>
-          </BlockStack>
-        </Card>
-
-        {experiment.status === "DRAFT" && (
+{experiment.status === "DRAFT" && (
           <Banner title="Test is not active" tone="warning">
             <Text as="p" variant="bodySm">
               Add the DML Shop Pay Badge A/B block to your product template in Theme Customizer, then click Activate below.

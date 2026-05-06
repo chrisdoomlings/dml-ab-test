@@ -3,8 +3,10 @@
 {%- assign installments = block.settings.installments | default: 4 -%}
 
 {%- if product -%}
+{%- assign target_handle = block.settings.target_product_handle | strip -%}
+{%- if target_handle == blank or product.handle == target_handle -%}
 
-  {{- '#dml-badge-a,#dml-badge-b{display:none}' | prepend: '<style>' | append: '</style>' -}}
+<style>#dml-badge-a,#dml-badge-b{display:none}</style>
 
   <!-- Control (A): empty placeholder — nothing visible -->
   <div id="dml-badge-a" aria-hidden="true"></div>
@@ -24,7 +26,7 @@
         fill="{{ block.settings.icon_color }}"/>
     </svg>
     Available in <strong>{{ installments }}</strong> monthly payments of
-    <strong class="dml-badge-install-price">{{ variant_price | divided_by: installments | money }}</strong>
+    <strong class="dml-badge-install-price"></strong>
     through <strong>Shop Pay Installments</strong>
   </div>
 
@@ -34,14 +36,16 @@
     if (!badge) return;
 
     var installments = parseInt(badge.dataset.installments, 10) || 4;
-    var moneyFormat = badge.dataset.moneyFormat || '${{amount}}';
+    var moneyFormat = badge.dataset.moneyFormat;
     var priceEl = badge.querySelector('.dml-badge-install-price');
+    var PAT_AMT = '{' + '{amount}}';
+    var PAT_ND  = '{' + '{amount_no_decimals}}';
 
     function formatMoney(cents) {
       var amount = cents / 100 / installments;
-      return moneyFormat
-        .replace('{{amount_no_decimals}}', Math.round(amount).toString())
-        .replace('{{amount}}', amount.toFixed(2));
+      return (moneyFormat || '')
+        .replace(PAT_ND, Math.round(amount).toString())
+        .replace(PAT_AMT, amount.toFixed(2));
     }
 
     function updatePrice(cents) {
@@ -79,6 +83,7 @@
   </script>
 
 {%- endif -%}
+{%- endif -%}
 
 {% schema %}
 {
@@ -88,6 +93,13 @@
     {
       "type": "paragraph",
       "content": "Place this block below the Add to Cart button. Activate the test from the app dashboard."
+    },
+    {
+      "type": "text",
+      "id": "target_product_handle",
+      "label": "Target product handle",
+      "placeholder": "e.g. my-product-name",
+      "info": "Leave blank to show on all products. Enter a product handle to restrict to one product only."
     },
     {
       "type": "range",
