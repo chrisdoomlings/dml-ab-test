@@ -13,15 +13,23 @@ const SELECTOR_B = "#dml-img-b";
 const EXPERIMENT_TYPE = "IMAGE_SWAP";
 
 async function findOrCreateExperiment(shopId: string, defaultTrafficSplit: number) {
-  const active = await prisma.experiment.findFirst({
-    where: { shopId, status: "ACTIVE", OR: [{ type: EXPERIMENT_TYPE }, { type: null }] },
+  // Prefer: ACTIVE IMAGE_SWAP → ACTIVE any → most-recent IMAGE_SWAP → most-recent any
+  const activeImageSwap = await prisma.experiment.findFirst({
+    where: { shopId, status: "ACTIVE", type: EXPERIMENT_TYPE },
     include: { variants: true },
     orderBy: { createdAt: "desc" },
   });
-  if (active) return active;
+  if (activeImageSwap) return activeImageSwap;
+
+  const activeAny = await prisma.experiment.findFirst({
+    where: { shopId, status: "ACTIVE", type: null, variants: { some: { selector: SELECTOR_A } } },
+    include: { variants: true },
+    orderBy: { createdAt: "desc" },
+  });
+  if (activeAny) return activeAny;
 
   const existing = await prisma.experiment.findFirst({
-    where: { shopId, OR: [{ type: EXPERIMENT_TYPE }, { type: null }] },
+    where: { shopId, OR: [{ type: EXPERIMENT_TYPE }, { type: null, variants: { some: { selector: SELECTOR_A } } }] },
     include: { variants: true },
     orderBy: { createdAt: "desc" },
   });
@@ -48,6 +56,11 @@ async function findOrCreateExperiment(shopId: string, defaultTrafficSplit: numbe
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const shop = await requireShopRecord(request);
+  // Clear stale endsAt from any previously-stopped-then-reactivated experiments
+  await prisma.experiment.updateMany({
+    where: { shopId: shop.id, status: "ACTIVE", endsAt: { lt: new Date() } },
+    data: { endsAt: null },
+  });
   const experiment = await findOrCreateExperiment(shop.id, shop.defaultTrafficSplit);
   const summary = await getExperimentSummary(experiment.id);
   return json({
@@ -60,17 +73,20 @@ export async function action({ request }: ActionFunctionArgs) {
   const shop = await requireShopRecord(request);
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");
-  let experiment = await prisma.experiment.findFirst({
-    where: { shopId: shop.id, status: "ACTIVE", OR: [{ type: EXPERIMENT_TYPE }, { type: null }] },
-    select: { id: true },
-  });
-  if (!experiment) {
-    experiment = await prisma.experiment.findFirst({
-      where: { shopId: shop.id, OR: [{ type: EXPERIMENT_TYPE }, { type: null }] },
+  let experiment =
+    (await prisma.experiment.findFirst({
+      where: { shopId: shop.id, status: "ACTIVE", type: EXPERIMENT_TYPE },
+      select: { id: true },
+    })) ??
+    (await prisma.experiment.findFirst({
+      where: { shopId: shop.id, status: "ACTIVE", type: null, variants: { some: { selector: SELECTOR_A } } },
+      select: { id: true },
+    })) ??
+    (await prisma.experiment.findFirst({
+      where: { shopId: shop.id, OR: [{ type: EXPERIMENT_TYPE }, { type: null, variants: { some: { selector: SELECTOR_A } } }] },
       select: { id: true },
       orderBy: { createdAt: "desc" },
-    });
-  }
+    }));
   if (!experiment) return redirect("/app");
 
   if (["ACTIVE", "PAUSED", "STOPPED", "DRAFT"].includes(intent)) {

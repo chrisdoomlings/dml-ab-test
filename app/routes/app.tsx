@@ -29,7 +29,6 @@ export default function AppLayout() {
       <NavMenu>
         <a href="/app" rel="home">Image Swap</a>
         <a href="/app/pricing">Pricing Badge</a>
-        <a href="/app/settings">Settings</a>
       </NavMenu>
 
       <Outlet />
