@@ -8,3 +8,5 @@ dist/
 coverage/
 .DS_Store
 packages.liquid 
+pebble2
+pebble3

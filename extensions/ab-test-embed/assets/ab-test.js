@@ -407,6 +407,88 @@ function track(payload) {
     }
   }
 
+  // ─── Debug panel ─────────────────────────────────────────────────────────
+
+  var DEBUG_PARAM = "dml_ab_debug";
+
+  function isDebugMode() {
+    try { return new URLSearchParams(window.location.search).get(DEBUG_PARAM) === "1"; } catch (e) { return false; }
+  }
+
+  function showDebugPanel(status, experiments, apiUrl) {
+    try {
+      if (document.getElementById("dml-ab-debug-panel")) return;
+
+      var hasImgA = !!document.querySelector("#dml-img-a");
+      var hasImgB = !!document.querySelector("#dml-img-b");
+      var assignments = getAssignments();
+
+      var rows = [
+        ["Script loaded", "✅ Yes"],
+        ["Shop domain", cfg.shopDomain],
+        ["Page path", location.pathname],
+        ["Template", cfg.template || "(none)"],
+        ["Visitor ID", visitorId.slice(0, 16) + "…"],
+        ["Returning visitor", isReturningVisitor ? "Yes" : "No (new visitor)"],
+        ["API status", status],
+        ["Experiments returned", experiments.length === 0 ? "❌ None — check experiment Target page & Audience settings" : "✅ " + experiments.length],
+        ["#dml-img-a on page", hasImgA ? "✅ Found" : "❌ Not found — enable A/B test on image card block"],
+        ["#dml-img-b on page", hasImgB ? "✅ Found" : "❌ Not found — upload Variant B image & enable A/B test"],
+        ["Current assignment", Object.keys(assignments).length ? JSON.stringify(assignments) : "None yet"],
+      ];
+
+      if (experiments.length > 0) {
+        experiments.forEach(function (exp) {
+          rows.push(["Experiment: " + exp.name, "Assigned variant: " + exp.variant]);
+        });
+      }
+
+      var panel = document.createElement("div");
+      panel.id = "dml-ab-debug-panel";
+      panel.style.cssText = [
+        "position:fixed", "top:12px", "right:12px", "z-index:2147483647",
+        "background:#18181b", "color:#e4e4e7", "border-radius:10px",
+        "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',monospace",
+        "font-size:12px", "line-height:1.5", "padding:14px 16px",
+        "box-shadow:0 4px 24px rgba(0,0,0,.6)", "max-width:380px", "width:calc(100vw - 32px)",
+      ].join(";");
+
+      var title = document.createElement("div");
+      title.style.cssText = "font-weight:700;font-size:13px;color:#fbbf24;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;";
+      title.innerHTML = "<span>🔬 DML AB Test — Debug</span>";
+
+      var closeBtn = document.createElement("button");
+      closeBtn.textContent = "✕";
+      closeBtn.style.cssText = "background:none;border:none;color:#71717a;cursor:pointer;font-size:14px;padding:0;margin-left:8px;";
+      closeBtn.onclick = function () { panel.parentNode && panel.parentNode.removeChild(panel); };
+      title.appendChild(closeBtn);
+      panel.appendChild(title);
+
+      var table = document.createElement("table");
+      table.style.cssText = "width:100%;border-collapse:collapse;";
+      rows.forEach(function (row) {
+        var tr = document.createElement("tr");
+        var td1 = document.createElement("td");
+        var td2 = document.createElement("td");
+        td1.style.cssText = "color:#a1a1aa;padding:2px 8px 2px 0;vertical-align:top;white-space:nowrap;";
+        td2.style.cssText = "color:#e4e4e7;padding:2px 0;word-break:break-all;";
+        td1.textContent = row[0];
+        td2.textContent = row[1];
+        tr.appendChild(td1);
+        tr.appendChild(td2);
+        table.appendChild(tr);
+      });
+      panel.appendChild(table);
+
+      var apiRow = document.createElement("div");
+      apiRow.style.cssText = "margin-top:8px;padding-top:8px;border-top:1px solid #27272a;color:#52525b;font-size:10px;word-break:break-all;";
+      apiRow.textContent = "API: " + apiUrl;
+      panel.appendChild(apiRow);
+
+      document.body.appendChild(panel);
+    } catch (e) {}
+  }
+
   // ─── Bootstrap ────────────────────────────────────────────────────────────
 
   var visitorId = getOrCreateVisitorId();
@@ -442,20 +524,19 @@ function track(payload) {
     removeAntiFlickerStyle();
   }, FETCH_TIMEOUT_MS);
 
-  fetch(
-    cfg.appBaseUrl +
-      "/api/experiments/active?shop=" + encodeURIComponent(cfg.shopDomain) +
-      "&path=" + encodeURIComponent(location.pathname) +
-      "&template=" + encodeURIComponent(cfg.template || "") +
-      "&visitorId=" + encodeURIComponent(visitorId) +
-      "&sessionId=" + encodeURIComponent(sessionId) +
-      "&isReturning=" + (isReturningVisitor ? "1" : "0"),
-    {
-      credentials: "omit",
-      cache: "no-store",
-      signal: controller ? controller.signal : undefined,
-    },
-  )
+  var activeApiUrl = cfg.appBaseUrl +
+    "/api/experiments/active?shop=" + encodeURIComponent(cfg.shopDomain) +
+    "&path=" + encodeURIComponent(location.pathname) +
+    "&template=" + encodeURIComponent(cfg.template || "") +
+    "&visitorId=" + encodeURIComponent(visitorId) +
+    "&sessionId=" + encodeURIComponent(sessionId) +
+    "&isReturning=" + (isReturningVisitor ? "1" : "0");
+
+  fetch(activeApiUrl, {
+    credentials: "omit",
+    cache: "no-store",
+    signal: controller ? controller.signal : undefined,
+  })
     .then(function (r) { return r.json(); })
     .then(function (data) {
       clearTimeout(fetchTimeoutId);
@@ -465,6 +546,8 @@ function track(payload) {
       removeAntiFlickerStyle();
 
       var experiments = data.experiments || [];
+
+      if (isDebugMode()) showDebugPanel("✅ " + experiments.length + " experiment(s)", experiments, activeApiUrl);
 
       if (previewOverrides) {
         var previewExps = experiments.map(function (exp) {
@@ -494,6 +577,7 @@ function track(payload) {
     .catch(function () {
       clearTimeout(fetchTimeoutId);
       removeAntiFlickerStyle();
+      if (isDebugMode()) showDebugPanel("❌ API error / timeout", [], activeApiUrl);
       // Fail-open: original content (variant A / theme default) remains visible.
     });
 
