@@ -13,6 +13,13 @@ const SELECTOR_B = "#dml-img-b";
 const EXPERIMENT_TYPE = "IMAGE_SWAP";
 
 async function findOrCreateExperiment(shopId: string, defaultTrafficSplit: number) {
+  const active = await prisma.experiment.findFirst({
+    where: { shopId, status: "ACTIVE", OR: [{ type: EXPERIMENT_TYPE }, { type: null }] },
+    include: { variants: true },
+    orderBy: { createdAt: "desc" },
+  });
+  if (active) return active;
+
   const existing = await prisma.experiment.findFirst({
     where: { shopId, OR: [{ type: EXPERIMENT_TYPE }, { type: null }] },
     include: { variants: true },
@@ -53,10 +60,17 @@ export async function action({ request }: ActionFunctionArgs) {
   const shop = await requireShopRecord(request);
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");
-  const experiment = await prisma.experiment.findFirst({
-    where: { shopId: shop.id, OR: [{ type: EXPERIMENT_TYPE }, { type: null }] },
+  let experiment = await prisma.experiment.findFirst({
+    where: { shopId: shop.id, status: "ACTIVE", OR: [{ type: EXPERIMENT_TYPE }, { type: null }] },
     select: { id: true },
   });
+  if (!experiment) {
+    experiment = await prisma.experiment.findFirst({
+      where: { shopId: shop.id, OR: [{ type: EXPERIMENT_TYPE }, { type: null }] },
+      select: { id: true },
+      orderBy: { createdAt: "desc" },
+    });
+  }
   if (!experiment) return redirect("/app");
 
   if (["ACTIVE", "PAUSED", "STOPPED", "DRAFT"].includes(intent)) {
@@ -73,6 +87,7 @@ export async function action({ request }: ActionFunctionArgs) {
       data: {
         audienceRule: audienceRule as any,
         trafficSplitA: Math.min(99, Math.max(1, trafficSplitA)),
+        endsAt: null,
       },
     });
   }

@@ -67,7 +67,7 @@ export async function updateExperimentStatus(input: {
     data: {
       status: input.status,
       startsAt: input.status === ExperimentStatus.ACTIVE && !existing?.startsAt ? new Date() : undefined,
-      endsAt: input.status === ExperimentStatus.STOPPED ? new Date() : undefined,
+      endsAt: input.status === ExperimentStatus.STOPPED ? new Date() : input.status === ExperimentStatus.ACTIVE ? null : undefined,
     },
   });
 }

@@ -431,7 +431,7 @@ function track(payload) {
         ["Visitor ID", visitorId.slice(0, 16) + "…"],
         ["Returning visitor", isReturningVisitor ? "Yes" : "No (new visitor)"],
         ["API status", status],
-        ["Experiments returned", experiments.length === 0 ? "❌ None — check experiment Target page & Audience settings" : "✅ " + experiments.length],
+        ["Experiments returned", experiments.length === 0 ? "❌ None — click API link below to see raw response" : "✅ " + experiments.length],
         ["#dml-img-a on page", hasImgA ? "✅ Found" : "❌ Not found — enable A/B test on image card block"],
         ["#dml-img-b on page", hasImgB ? "✅ Found" : "❌ Not found — upload Variant B image & enable A/B test"],
         ["Current assignment", Object.keys(assignments).length ? JSON.stringify(assignments) : "None yet"],
@@ -480,9 +480,32 @@ function track(payload) {
       });
       panel.appendChild(table);
 
+      var resetDebugBtn = document.createElement("button");
+      resetDebugBtn.textContent = "↺ Reset visitor (test as new)";
+      resetDebugBtn.style.cssText = [
+        "margin-top:8px", "padding:4px 10px", "border-radius:4px", "border:none", "cursor:pointer",
+        "background:#27272a", "color:#a1a1aa", "font-size:11px", "font-weight:600",
+        "white-space:nowrap", "font-family:inherit", "display:block",
+      ].join(";");
+      resetDebugBtn.addEventListener("click", function () {
+        clearAllAssignments();
+        window.location.reload();
+      });
+      panel.appendChild(resetDebugBtn);
+
       var apiRow = document.createElement("div");
-      apiRow.style.cssText = "margin-top:8px;padding-top:8px;border-top:1px solid #27272a;color:#52525b;font-size:10px;word-break:break-all;";
-      apiRow.textContent = "API: " + apiUrl;
+      apiRow.style.cssText = "margin-top:8px;padding-top:8px;border-top:1px solid #27272a;font-size:10px;word-break:break-all;";
+      var apiLabel = document.createElement("span");
+      apiLabel.style.cssText = "color:#52525b;";
+      apiLabel.textContent = "API: ";
+      var apiLink = document.createElement("a");
+      apiLink.href = apiUrl;
+      apiLink.target = "_blank";
+      apiLink.rel = "noopener";
+      apiLink.style.cssText = "color:#3b82f6;text-decoration:underline;";
+      apiLink.textContent = apiUrl;
+      apiRow.appendChild(apiLabel);
+      apiRow.appendChild(apiLink);
       panel.appendChild(apiRow);
 
       document.body.appendChild(panel);
