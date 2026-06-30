@@ -1,7 +1,7 @@
 import { json, redirect, type ActionFunctionArgs, type LoaderFunctionArgs } from "@remix-run/node";
 import { Form, useLoaderData, useNavigation, useSubmit } from "@remix-run/react";
 import { useState } from "react";
-import { Badge, Banner, BlockStack, Box, Button, Card, InlineGrid, InlineStack, Modal, Page, Text, Tooltip } from "@shopify/polaris";
+import { Badge, Banner, BlockStack, Box, Button, Card, FormLayout, InlineGrid, InlineStack, Modal, Page, Select, Text, TextField, Tooltip } from "@shopify/polaris";
 import { prisma } from "../lib/db.server";
 import { requireShopRecord } from "../lib/shop.server";
 import { getExperimentSummary, updateExperimentStatus, simulateTraffic, clearExperimentData } from "../models/experiments.server";
@@ -14,7 +14,7 @@ const EXPERIMENT_TYPE = "IMAGE_SWAP";
 
 async function findOrCreateExperiment(shopId: string, defaultTrafficSplit: number) {
   const existing = await prisma.experiment.findFirst({
-    where: { shopId, type: EXPERIMENT_TYPE },
+    where: { shopId, OR: [{ type: EXPERIMENT_TYPE }, { type: null }] },
     include: { variants: true },
     orderBy: { createdAt: "desc" },
   });
@@ -54,7 +54,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");
   const experiment = await prisma.experiment.findFirst({
-    where: { shopId: shop.id, type: EXPERIMENT_TYPE },
+    where: { shopId: shop.id, OR: [{ type: EXPERIMENT_TYPE }, { type: null }] },
     select: { id: true },
   });
   if (!experiment) return redirect("/app");
@@ -65,6 +65,16 @@ export async function action({ request }: ActionFunctionArgs) {
     await simulateTraffic(experiment.id, shop.id, 50);
   } else if (intent === "clearData") {
     await clearExperimentData(experiment.id, shop.id);
+  } else if (intent === "updateSettings") {
+    const audienceRule = String(formData.get("audienceRule") ?? "ALL_VISITORS");
+    const trafficSplitA = Number(formData.get("trafficSplitA") ?? 50);
+    await prisma.experiment.update({
+      where: { id: experiment.id },
+      data: {
+        audienceRule: audienceRule as any,
+        trafficSplitA: Math.min(99, Math.max(1, trafficSplitA)),
+      },
+    });
   }
 
   return redirect("/app");
@@ -115,6 +125,57 @@ function MiniChart({ cvrA, cvrB }: { cvrA: number; cvrB: number }) {
       <text x="230" y={162 - barA} textAnchor="middle" fill="#111111" fontSize="13">{percent(cvrA)}</text>
       <text x="430" y={162 - barB} textAnchor="middle" fill="#005bd3" fontSize="13">{percent(cvrB)}</text>
     </svg>
+  );
+}
+
+const AUDIENCE_OPTIONS = [
+  { label: "All visitors", value: "ALL_VISITORS" },
+  { label: "New visitors only", value: "NEW_VISITORS" },
+  { label: "Returning visitors only", value: "RETURNING_VISITORS" },
+];
+
+function TestSettingsCard({
+  audienceRule,
+  trafficSplitA,
+  isSubmitting,
+}: {
+  audienceRule: string;
+  trafficSplitA: number;
+  isSubmitting: boolean;
+}) {
+  const [audience, setAudience] = useState(audienceRule);
+  const [split, setSplit] = useState(String(trafficSplitA));
+
+  return (
+    <Card>
+      <Form method="post">
+        <input type="hidden" name="intent" value="updateSettings" />
+        <FormLayout>
+          <Text as="h2" variant="headingMd">Test settings</Text>
+          <Select
+            label="Audience"
+            name="audienceRule"
+            options={AUDIENCE_OPTIONS}
+            value={audience}
+            onChange={setAudience}
+            helpText="Which visitors are included in the test."
+          />
+          <TextField
+            label="Traffic split — Original (A)"
+            name="trafficSplitA"
+            type="number"
+            min={1}
+            max={99}
+            suffix="%"
+            autoComplete="off"
+            value={split}
+            onChange={setSplit}
+            helpText={`Variant B gets ${100 - Number(split || 50)}%. 50 means an even split.`}
+          />
+          <Button submit variant="primary" loading={isSubmitting}>Save settings</Button>
+        </FormLayout>
+      </Form>
+    </Card>
   );
 }
 
@@ -273,6 +334,12 @@ export default function ImageSwapPage() {
             );
           })}
         </InlineGrid>
+
+        <TestSettingsCard
+          audienceRule={experiment.audienceRule}
+          trafficSplitA={experiment.trafficSplitA}
+          isSubmitting={isSubmitting}
+        />
 
         <Card>
           <BlockStack gap="300">
