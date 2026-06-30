@@ -15,6 +15,7 @@ model Shop {
   defaultTrafficSplit   Int            @default(50)
   defaultAssignmentMode AssignmentMode @default(STICKY)
   certaintyThreshold    Int            @default(85)
+  debugMode             Boolean        @default(false)
   createdAt             DateTime       @default(now())
   updatedAt             DateTime       @updatedAt
   experiments           Experiment[]

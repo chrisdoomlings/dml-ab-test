@@ -1,7 +1,7 @@
 import { json, redirect, type ActionFunctionArgs, type LoaderFunctionArgs } from "@remix-run/node";
 import { Form, useLoaderData, useNavigation, useSubmit } from "@remix-run/react";
 import { useState } from "react";
-import { Badge, Banner, BlockStack, Box, Button, Card, FormLayout, InlineGrid, InlineStack, Modal, Page, Select, Text, TextField, Tooltip } from "@shopify/polaris";
+import { Badge, Banner, BlockStack, Box, Button, Card, Checkbox, FormLayout, InlineGrid, InlineStack, Modal, Page, Select, Text, TextField, Tooltip } from "@shopify/polaris";
 import { prisma } from "../lib/db.server";
 import { requireShopRecord } from "../lib/shop.server";
 import { getExperimentSummary, updateExperimentStatus, simulateTraffic, clearExperimentData } from "../models/experiments.server";
@@ -66,6 +66,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return json({
     experiment: summarizeExperiment(experiment, summary),
     certaintyThreshold: shop.certaintyThreshold,
+    debugMode: shop.debugMode,
   });
 }
 
@@ -100,16 +101,23 @@ export async function action({ request }: ActionFunctionArgs) {
     const trafficSplitA = Number(formData.get("trafficSplitA") ?? 50);
     const targetPage = String(formData.get("targetPage") ?? "ALL_PAGES");
     const [targetType, targetValue] = targetPage.includes(":") ? targetPage.split(":") : [targetPage, null];
-    await prisma.experiment.update({
-      where: { id: experiment.id },
-      data: {
-        audienceRule: audienceRule as any,
-        trafficSplitA: Math.min(99, Math.max(1, trafficSplitA)),
-        targetType: targetType as any,
-        targetValue: targetValue ?? null,
-        endsAt: null,
-      },
-    });
+    const debugMode = formData.get("debugMode") === "1";
+    await Promise.all([
+      prisma.experiment.update({
+        where: { id: experiment.id },
+        data: {
+          audienceRule: audienceRule as any,
+          trafficSplitA: Math.min(99, Math.max(1, trafficSplitA)),
+          targetType: targetType as any,
+          targetValue: targetValue ?? null,
+          endsAt: null,
+        },
+      }),
+      prisma.shop.update({
+        where: { id: shop.id },
+        data: { debugMode },
+      }),
+    ]);
   }
 
   return redirect("/app");
@@ -181,23 +189,27 @@ function TestSettingsCard({
   trafficSplitA,
   targetType,
   targetValue,
+  debugMode,
   isSubmitting,
 }: {
   audienceRule: string;
   trafficSplitA: number;
   targetType: string;
   targetValue: string | null;
+  debugMode: boolean;
   isSubmitting: boolean;
 }) {
   const [audience, setAudience] = useState(audienceRule);
   const [split, setSplit] = useState(String(trafficSplitA));
   const currentTarget = targetType === "TEMPLATE" && targetValue ? `TEMPLATE:${targetValue}` : "ALL_PAGES";
   const [target, setTarget] = useState(currentTarget);
+  const [debug, setDebug] = useState(debugMode);
 
   return (
     <Card>
       <Form method="post">
         <input type="hidden" name="intent" value="updateSettings" />
+        <input type="hidden" name="debugMode" value={debug ? "1" : "0"} />
         <FormLayout>
           <Text as="h2" variant="headingMd">Test settings</Text>
           <Select
@@ -228,6 +240,12 @@ function TestSettingsCard({
             onChange={setSplit}
             helpText={`Variant B gets ${100 - Number(split || 50)}%. 50 means an even split.`}
           />
+          <Checkbox
+            label="Enable debug panel on storefront"
+            checked={debug}
+            onChange={setDebug}
+            helpText="When on, visiting any page with ?dml_ab_debug=1 shows the debug overlay. Turn off when not needed."
+          />
           <Button submit variant="primary" loading={isSubmitting}>Save settings</Button>
         </FormLayout>
       </Form>
@@ -236,7 +254,7 @@ function TestSettingsCard({
 }
 
 export default function ImageSwapPage() {
-  const { experiment, certaintyThreshold } = useLoaderData<typeof loader>();
+  const { experiment, certaintyThreshold, debugMode } = useLoaderData<typeof loader>();
   const navigation = useNavigation();
   const submit = useSubmit();
   const isSubmitting = navigation.state === "submitting";
@@ -396,6 +414,7 @@ export default function ImageSwapPage() {
           trafficSplitA={experiment.trafficSplitA}
           targetType={experiment.targetType}
           targetValue={experiment.targetValue}
+          debugMode={debugMode}
           isSubmitting={isSubmitting}
         />
 

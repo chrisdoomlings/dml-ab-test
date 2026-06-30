@@ -13,6 +13,7 @@
   var liveExperimentsState = [];
   var pageStartTime = Date.now();
   var maxScrollDepth = 0;
+  var serverDebugEnabled = false;
 
   // ─── Visitor / session identity ──────────────────────────────────────────
 
@@ -569,8 +570,9 @@ function track(payload) {
       removeAntiFlickerStyle();
 
       var experiments = data.experiments || [];
+      serverDebugEnabled = !!data.debugEnabled;
 
-      if (isDebugMode()) showDebugPanel("✅ " + experiments.length + " experiment(s)", experiments, activeApiUrl);
+      if (isDebugMode() && serverDebugEnabled) showDebugPanel("✅ " + experiments.length + " experiment(s)", experiments, activeApiUrl);
 
       if (previewOverrides) {
         var previewExps = experiments.map(function (exp) {
@@ -600,7 +602,7 @@ function track(payload) {
     .catch(function () {
       clearTimeout(fetchTimeoutId);
       removeAntiFlickerStyle();
-      if (isDebugMode()) showDebugPanel("❌ API error / timeout", [], activeApiUrl);
+      if (isDebugMode() && serverDebugEnabled) showDebugPanel("❌ API error / timeout", [], activeApiUrl);
       // Fail-open: original content (variant A / theme default) remains visible.
     });
 

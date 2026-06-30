@@ -73,5 +73,5 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }),
   );
 
-  return json({ experiments: withAssignments }, { headers });
+  return json({ experiments: withAssignments, debugEnabled: shop.debugMode }, { headers });
 }
