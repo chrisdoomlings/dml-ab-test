@@ -1,7 +1,7 @@
 import { json, redirect, type ActionFunctionArgs, type LoaderFunctionArgs } from "@remix-run/node";
 import { Form, useLoaderData, useNavigation, useSubmit } from "@remix-run/react";
 import { useState } from "react";
-import { Badge, Banner, BlockStack, Box, Button, Card, InlineGrid, InlineStack, Modal, Page, Text, Tooltip } from "@shopify/polaris";
+import { Badge, Banner, BlockStack, Box, Button, Card, FormLayout, InlineGrid, InlineStack, Modal, Page, Select, Text, TextField, Tooltip } from "@shopify/polaris";
 import { prisma } from "../lib/db.server";
 import { requireShopRecord } from "../lib/shop.server";
 import { getExperimentSummary, updateExperimentStatus, simulateTraffic, clearExperimentData } from "../models/experiments.server";
@@ -13,8 +13,16 @@ const SELECTOR_B = "#dml-badge-b";
 const EXPERIMENT_TYPE = "SHOP_PAY_BADGE";
 
 async function findOrCreateExperiment(shopId: string, defaultTrafficSplit: number) {
+  // Prefer ACTIVE first, then fall back to any — also find old type=null badge experiments by selector
+  const active = await prisma.experiment.findFirst({
+    where: { shopId, status: "ACTIVE", OR: [{ type: EXPERIMENT_TYPE }, { type: null, variants: { some: { selector: SELECTOR_A } } }] },
+    include: { variants: true },
+    orderBy: { createdAt: "desc" },
+  });
+  if (active) return active;
+
   const existing = await prisma.experiment.findFirst({
-    where: { shopId, type: EXPERIMENT_TYPE },
+    where: { shopId, OR: [{ type: EXPERIMENT_TYPE }, { type: null, variants: { some: { selector: SELECTOR_A } } }] },
     include: { variants: true },
     orderBy: { createdAt: "desc" },
   });
@@ -41,6 +49,10 @@ async function findOrCreateExperiment(shopId: string, defaultTrafficSplit: numbe
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const shop = await requireShopRecord(request);
+  await prisma.experiment.updateMany({
+    where: { shopId: shop.id, status: "ACTIVE", endsAt: { lt: new Date() } },
+    data: { endsAt: null },
+  });
   const experiment = await findOrCreateExperiment(shop.id, shop.defaultTrafficSplit);
   const summary = await getExperimentSummary(experiment.id);
   return json({
@@ -53,10 +65,16 @@ export async function action({ request }: ActionFunctionArgs) {
   const shop = await requireShopRecord(request);
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");
-  const experiment = await prisma.experiment.findFirst({
-    where: { shopId: shop.id, type: EXPERIMENT_TYPE },
-    select: { id: true },
-  });
+  let experiment =
+    (await prisma.experiment.findFirst({
+      where: { shopId: shop.id, status: "ACTIVE", OR: [{ type: EXPERIMENT_TYPE }, { type: null, variants: { some: { selector: SELECTOR_A } } }] },
+      select: { id: true },
+    })) ??
+    (await prisma.experiment.findFirst({
+      where: { shopId: shop.id, OR: [{ type: EXPERIMENT_TYPE }, { type: null, variants: { some: { selector: SELECTOR_A } } }] },
+      select: { id: true },
+      orderBy: { createdAt: "desc" },
+    }));
   if (!experiment) return redirect("/app/pricing");
 
   if (["ACTIVE", "PAUSED", "STOPPED", "DRAFT"].includes(intent)) {
@@ -65,9 +83,44 @@ export async function action({ request }: ActionFunctionArgs) {
     await simulateTraffic(experiment.id, shop.id, 50);
   } else if (intent === "clearData") {
     await clearExperimentData(experiment.id, shop.id);
+  } else if (intent === "updateSettings") {
+    const audienceRule = String(formData.get("audienceRule") ?? "ALL_VISITORS");
+    const trafficSplitA = Number(formData.get("trafficSplitA") ?? 50);
+    await prisma.experiment.update({
+      where: { id: experiment.id },
+      data: {
+        audienceRule: audienceRule as any,
+        trafficSplitA: Math.min(99, Math.max(1, trafficSplitA)),
+        endsAt: null,
+      },
+    });
   }
 
   return redirect("/app/pricing");
+}
+
+const AUDIENCE_OPTIONS = [
+  { label: "All visitors", value: "ALL_VISITORS" },
+  { label: "New visitors only", value: "NEW_VISITORS" },
+  { label: "Returning visitors only", value: "RETURNING_VISITORS" },
+];
+
+function TestSettingsCard({ audienceRule, trafficSplitA, isSubmitting }: { audienceRule: string; trafficSplitA: number; isSubmitting: boolean }) {
+  const [audience, setAudience] = useState(audienceRule);
+  const [split, setSplit] = useState(String(trafficSplitA));
+  return (
+    <Card>
+      <Form method="post">
+        <input type="hidden" name="intent" value="updateSettings" />
+        <FormLayout>
+          <Text as="h2" variant="headingMd">Test settings</Text>
+          <Select label="Audience" name="audienceRule" options={AUDIENCE_OPTIONS} value={audience} onChange={setAudience} />
+          <TextField label="Traffic split — No badge (A)" name="trafficSplitA" type="number" min="1" max="99" suffix="%" value={split} onChange={setSplit} autoComplete="off" />
+          <Button submit variant="primary" loading={isSubmitting}>Save settings</Button>
+        </FormLayout>
+      </Form>
+    </Card>
+  );
 }
 
 function statusTone(status: string): "success" | "warning" | undefined {
@@ -272,6 +325,8 @@ export default function ShopPayBadgePage() {
             );
           })}
         </InlineGrid>
+
+        <TestSettingsCard audienceRule={experiment.audienceRule} trafficSplitA={experiment.trafficSplitA} isSubmitting={isSubmitting} />
 
         <Card>
           <BlockStack gap="300">

@@ -98,11 +98,15 @@ export async function action({ request }: ActionFunctionArgs) {
   } else if (intent === "updateSettings") {
     const audienceRule = String(formData.get("audienceRule") ?? "ALL_VISITORS");
     const trafficSplitA = Number(formData.get("trafficSplitA") ?? 50);
+    const targetPage = String(formData.get("targetPage") ?? "ALL_PAGES");
+    const [targetType, targetValue] = targetPage.includes(":") ? targetPage.split(":") : [targetPage, null];
     await prisma.experiment.update({
       where: { id: experiment.id },
       data: {
         audienceRule: audienceRule as any,
         trafficSplitA: Math.min(99, Math.max(1, trafficSplitA)),
+        targetType: targetType as any,
+        targetValue: targetValue ?? null,
         endsAt: null,
       },
     });
@@ -165,17 +169,30 @@ const AUDIENCE_OPTIONS = [
   { label: "Returning visitors only", value: "RETURNING_VISITORS" },
 ];
 
+const TARGET_OPTIONS = [
+  { label: "All pages", value: "ALL_PAGES" },
+  { label: "Home page only", value: "TEMPLATE:index" },
+  { label: "Product pages only", value: "TEMPLATE:product" },
+  { label: "Collection pages only", value: "TEMPLATE:collection" },
+];
+
 function TestSettingsCard({
   audienceRule,
   trafficSplitA,
+  targetType,
+  targetValue,
   isSubmitting,
 }: {
   audienceRule: string;
   trafficSplitA: number;
+  targetType: string;
+  targetValue: string | null;
   isSubmitting: boolean;
 }) {
   const [audience, setAudience] = useState(audienceRule);
   const [split, setSplit] = useState(String(trafficSplitA));
+  const currentTarget = targetType === "TEMPLATE" && targetValue ? `TEMPLATE:${targetValue}` : "ALL_PAGES";
+  const [target, setTarget] = useState(currentTarget);
 
   return (
     <Card>
@@ -183,6 +200,14 @@ function TestSettingsCard({
         <input type="hidden" name="intent" value="updateSettings" />
         <FormLayout>
           <Text as="h2" variant="headingMd">Test settings</Text>
+          <Select
+            label="Target page"
+            name="targetPage"
+            options={TARGET_OPTIONS}
+            value={target}
+            onChange={setTarget}
+            helpText="Which pages this experiment runs on."
+          />
           <Select
             label="Audience"
             name="audienceRule"
@@ -369,6 +394,8 @@ export default function ImageSwapPage() {
         <TestSettingsCard
           audienceRule={experiment.audienceRule}
           trafficSplitA={experiment.trafficSplitA}
+          targetType={experiment.targetType}
+          targetValue={experiment.targetValue}
           isSubmitting={isSubmitting}
         />
 
